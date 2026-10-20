@@ -5,11 +5,11 @@ status: approved
 
 # Build Checklist
 
-Build mode: not chosen yet
+Build mode: fast
 
 ## Slices
 
-- [ ] **1. You can turn a real demo video into labelled frames and a transcript on your own machine**
+- [x] **1. You can turn a real demo video into labelled frames and a transcript on your own machine**
   Becomes usable: `python -m demotrace.cli prepare video.mp4 --out out/` writes up to 90 de-duplicated JPEG frames (each labelled `F001…` with its time in the video) and speech segments (`S01…` with start and end) as JSON, and refuses a video longer than 3 minutes.
   Why now: Every later step stands on correct timestamps and on a request that fits the size cap. It costs no cloud money and is the input the model call needs. Project scaffolding is part of this slice.
   PRD ref: `prd.md > The Core Journey` (steps 5–6 depend on correct times), `prd.md > States and Boundaries` (no audio, longer than 3 minutes, static video)
@@ -152,4 +152,6 @@ Reflection: [offered/answered/declined/already covered — personal answer belon
 Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
 
 ## Revisions
+
+- De-duplication now needs both the perceptual hash and a changed-pixel check on a colour thumbnail to call two frames duplicates (`spec.md > Worker pipeline`, `backend/worker/demotrace/media/dedupe.py`) — the build found that the perceptual hash gives a red and a blue screen the same hash, so a colour-only change such as a status turning green would have been thrown away as a duplicate.
 
