@@ -1,0 +1,21 @@
+# Personal learning context (Devpost Learn)
+/devpost/learner-profile.md
+
+# Local credentials — keep a secret-free .env.example
+.env
+.env.*
+!.env.example
+
+# Terraform state and local working files
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
+
+# Test videos and eval run outputs
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.mkv
+/eval/runs/
