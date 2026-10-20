@@ -11,6 +11,7 @@ from pathlib import Path
 from demotrace_shared.errors import ERROR_MESSAGES
 from demotrace_shared.limits import REQUEST_MAX_BYTES
 
+from . import awsguard
 from .llm import ModelError
 from .media import MediaError
 from .prepare import prepare
@@ -41,7 +42,10 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     from .llm.prompt import build_request
     from .smoke import describe, load_claims, load_frames, small_case
 
-    client = make_client(args.profile)
+    profile = awsguard.profile(args.profile)
+    account = awsguard.check_account(profile)  # before anything else touches AWS
+    print(f"AWS account {account} via profile {profile}: matches DEMOTRACE_AWS_ACCOUNT_ID")
+    client = make_client(profile)
     fixtures = Path(args.fixtures)
     cases = []
     if not args.skip_small:
@@ -82,12 +86,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--video", help="a real demo video for the realistic request")
     s.add_argument("--claims", help="JSON file with 3–5 claims for --video")
     s.add_argument("--name", help="fixture name for the realistic request (default: the video's file name)")
-    s.add_argument("--profile", default=None, help="AWS profile to use (default: the normal AWS chain)")
+    s.add_argument("--profile", default=None, help="AWS profile to use (default: AWS_PROFILE from .env)")
     s.add_argument("--out", default="out/smoke", help="where prepared frames go")
     s.add_argument("--fixtures", default="eval/fixtures", help="where answers are saved")
     s.add_argument("--skip-small", action="store_true", help="only run the realistic request")
     s.set_defaults(func=cmd_smoke)
 
+    awsguard.load_env()  # local, gitignored .env in the directory you run from
     args = parser.parse_args(argv)
     try:
         return args.func(args)
@@ -97,6 +102,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {err.code}: {ERROR_MESSAGES.get(err.code, '')}{detail}"
               + (f" request_id={request_id}" if request_id else ""), file=sys.stderr)
         return 2
+    except awsguard.WrongAccount as err:
+        print(f"error: {err}", file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":
