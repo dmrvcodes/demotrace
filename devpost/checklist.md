@@ -1,6 +1,6 @@
 ---
 doc: checklist
-status: draft
+status: approved
 ---
 
 # Build Checklist
@@ -49,9 +49,19 @@ Build mode: not chosen yet
   Learner check: Label the 3 videos with me (statuses and time ranges), run the gate, and tell me whether the failures it reports match your own judgement.
   Commit: `Add labelled eval cases and quality gate runner`
 
-- [ ] **5. The same analysis runs inside a real Lambda and writes its result to DynamoDB**
+- [ ] **5. The interface works end to end on the sample**
+  Becomes usable: The four steps in the browser in the dark look from the PRD. **Try with sample** opens Results with the video, the timeline and one card per claim; clicking a timestamp or a marker moves the player and highlights the card; the "AI assessment" note is visible.
+  Why now: After slices 1–4 you already have a real result from your own pipeline, so the Results screen, the timeline and click-to-seek can be built on it right away. Design is a quarter of the judging, so the look and the core interaction come early, while feedback can still shape the rest, and an early weak demo can be shown. Fixture mode needs no AWS.
+  PRD ref: `prd.md > Results and evidence`, `prd.md > Try with sample`, `prd.md > Look and Feel`, `prd.md > Screens and Layout`
+  Spec ref: `spec.md > Web app shell`, `spec.md > Results view`, `spec.md > Sample mode and fixtures`, `spec.md > Look and Feel`
+  Build: Scaffold the Next.js app in `web/` (TypeScript, Tailwind, Inter and Geist Mono through `next/font`); theme tokens from the spec; `StatusBadge`, `ClaimCard`, `VideoPlayer`, `Timeline`; `sample.json` from the real result your own pipeline produced in slices 2–4, and `sample.mp4`, a short clip you own and agree to publish, with a `.gitignore` exception for `web/public/samples/` only; the Upload, Claims and Waiting steps as shells.
+  Verify (mechanical): `npm run build` and the linter pass; start the dev server, load the page in the browser pane, click **Try with sample**, check that a timestamp click sets the player time and highlights the card, and check the colors and fonts against the tokens.
+  Learner check: Open `http://localhost:3000`, click **Try with sample**, click timestamps and markers, and say whether the look matches what you pictured.
+  Commit: `Add interface with sample results, timeline and click-to-seek`
+
+- [ ] **6. The same analysis runs inside a real Lambda and writes its result to DynamoDB**
   Becomes usable: A spike script builds the arm64 Worker image, pushes it to ECR, creates the function, a DynamoDB table and an S3 bucket, and a test event with a `job_id` makes the Lambda fetch a video, run the pipeline, call Bedrock from its own role, and store the result.
-  Why now: This is the second big risk: the container with ffmpeg and faster-whisper on arm64, the IAM action from the Lambda role, and the real time and memory. It must be proven before a control API or an interface depends on it. No AWS call is made before your console checks are confirmed.
+  Why now: This is the second big risk: the container with ffmpeg and faster-whisper on arm64, the IAM action from the Lambda role, and the real time and memory. It must be proven before the control API and the live interface depend on it. Time-box: finish no later than the evening of Thursday 22 October; the scope is only S3, the pinned object version, the Worker Lambda, Bedrock, the DynamoDB result and the clean-up, with no Terraform, Function URL, budgets, CORS or public site (those are later slices). No AWS call is made before your console checks are confirmed.
   PRD ref: `prd.md > States and Boundaries` (privacy, failures)
   Spec ref: `spec.md > Worker pipeline`, `spec.md > Job state machine and limits`, `spec.md > AWS Lambda`, `spec.md > Amazon S3`, `spec.md > Amazon DynamoDB`, `spec.md > How We Verify` (Lambda run, State races), `spec.md > Fallbacks and Cut Order`
   Build: The Worker Dockerfile (Lambda Python 3.12 base, static arm64 ffmpeg, whisper model in `/opt/models`, offline environment, `HOME` untouched); the handler with the conditional claim, the pinned `VersionId` download, the conditional finish and the `finally` cleanup of every version; `scripts/spike-deploy.sh` with the AWS CLI; written measurements for time, memory, `cpu_threads` and whisper size.
@@ -59,9 +69,9 @@ Build mode: not chosen yet
   Learner check: Upload a short video yourself with the AWS CLI, send the test event, and confirm the result row appears and the video is gone from the bucket.
   Commit: `Run the worker on Lambda with DynamoDB state and measurements`
 
-- [ ] **6. A full backend flow works: create a job, upload straight to S3, analyze, poll**
+- [ ] **7. A full backend flow works: create a job, upload straight to S3, analyze, poll**
   Becomes usable: With a script, `POST /jobs` returns a token and an upload slot, the file goes to S3, `POST /jobs/{id}/analyze` queues it, and `GET /jobs/{id}` moves from queued to analyzing to done. Limits and token rules apply.
-  Why now: This is the backend the interface will talk to. The state rules and the privacy rules must be proven before a screen depends on them.
+  Why now: This is the backend the interface will talk to. The state rules and the privacy rules must be proven before the live interface depends on them.
   PRD ref: `prd.md > Waiting for the analysis`, `prd.md > States and Boundaries` (daily limits, privacy)
   Spec ref: `spec.md > Control API (FastAPI)`, `spec.md > Job state machine and limits`, `spec.md > Data Model`, `spec.md > How We Verify` (State races, Security and privacy)
   Build: The FastAPI app with the Mangum handler; the presigned upload slot; conditional state transitions; the time rules applied on read; atomic counters (global and per hashed IP); error codes including the capacity one; deployed as a zip Lambda with a Function URL and CORS configured there; tests with moto.
@@ -69,19 +79,9 @@ Build mode: not chosen yet
   Learner check: Run the provided script with your own video and watch the status move to done; confirm that a request without the token is refused.
   Commit: `Add control API with job state machine and limits`
 
-- [ ] **7. The interface works end to end on the sample**
-  Becomes usable: The four steps in the browser in the dark look from the PRD. **Try with sample** opens Results with the video, the timeline and one card per claim; clicking a timestamp or a marker moves the player and highlights the card; the "AI assessment" note is visible.
-  Why now: Design is a quarter of the judging, so the look and the core interaction come early, while feedback can still shape the rest. Fixture mode needs no AWS.
-  PRD ref: `prd.md > Results and evidence`, `prd.md > Try with sample`, `prd.md > Look and Feel`, `prd.md > Screens and Layout`
-  Spec ref: `spec.md > Web app shell`, `spec.md > Results view`, `spec.md > Sample mode and fixtures`, `spec.md > Look and Feel`
-  Build: Scaffold the Next.js app in `web/` (TypeScript, Tailwind, Inter and Geist Mono through `next/font`); theme tokens from the spec; `StatusBadge`, `ClaimCard`, `VideoPlayer`, `Timeline`; `sample.json` from a real saved result and `sample.mp4`, with a `.gitignore` exception for `web/public/samples/` only; the Upload, Claims and Waiting steps as shells.
-  Verify (mechanical): `npm run build` and the linter pass; start the dev server, load the page in the browser pane, click **Try with sample**, check that a timestamp click sets the player time and highlights the card, and check the colors and fonts against the tokens.
-  Learner check: Open `http://localhost:3000`, click **Try with sample**, click timestamps and markers, and say whether the look matches what you pictured.
-  Commit: `Add interface with sample results, timeline and click-to-seek`
-
 - [ ] **8. Public end to end: your own video, your claims, a real result**
   Becomes usable: On the deployed site, drop a video (the 3-minute and HEVC checks run first), it uploads in the background, you type claims, start, watch the waiting statuses, and get results from the live backend, with failure and capacity messages.
-  Why now: This is the first moment a judge could use the real product. Everything before it exists to make this step safe.
+  Why now: This is the first moment a judge could use the real product. Everything before it exists to make this step safe. Once it works on a real clip, preparing the demo recording can start; slices 10–12 do not hold it back.
   PRD ref: `prd.md > Upload`, `prd.md > Claims`, `prd.md > Waiting for the analysis`, `prd.md > States and Boundaries`
   Spec ref: `spec.md > Upload and video preflight`, `spec.md > Claims form`, `spec.md > Waiting view and status poller`, `spec.md > The Core Journey Through the System`
   Build: The real mode of the API client; the preflight; `DropZone` and `ClaimsForm`; the status poller; the failure and capacity banner; the Vercel deploy with `NEXT_PUBLIC_API_BASE_URL`.
@@ -109,17 +109,7 @@ Build mode: not chosen yet
   Learner check: Try to break it: a video over 3 minutes, an HEVC file, a refused request, a reload mid-analysis; tell me which message was unclear.
   Commit: `Harden limits, timeouts and clean-up on the live system`
 
-- [ ] **11. The infrastructure is rebuilt from Terraform**
-  Becomes usable: `terraform plan` shows no unexpected changes and `terraform apply` recreates the S3 bucket, DynamoDB table, ECR repository, both Lambdas with roles and log groups, the Function URL, the asynchronous-invoke settings and the Budget, with the Worker image pinned by digest.
-  Why now: Your plan puts it after a working end to end, so it can never delay the proof. It also makes the cleanup after judging a single command.
-  PRD ref: `prd.md > States and Boundaries` (privacy, daily limits)
-  Spec ref: `spec.md > Infrastructure (infra/)`, `spec.md > Amazon ECR, CloudWatch Logs, AWS Budgets`, `spec.md > After Submission`
-  Build: Terraform in `infra/` with local state kept outside the repository and `-var image_digest=...`; replace or import the spike resources without breaking the live site.
-  Verify (mechanical): `terraform validate` and `terraform plan` run clean; after apply, the end-to-end script from slice 8 still returns a valid result; no state file is tracked by git.
-  Learner check: Run the plan yourself and tell me whether the resources it lists are the ones you expect.
-  Commit: `Add Terraform for the backend infrastructure`
-
-- [ ] **12. A six-video quality pass you can quote honestly in the README**
+- [ ] **11. A six-video quality pass you can quote honestly in the README**
   Becomes usable: Six labelled videos (negatives included) run through the same gate, with the numbers and the prompt tuned until the goal of at least 80% holds.
   Why now: The quality of "shown versus told" is the product. Your plan reserves Friday and Saturday for it, after the system is stable.
   PRD ref: `prd.md > Product Decisions`
@@ -129,9 +119,19 @@ Build mode: not chosen yet
   Learner check: Look at every miss with me and say whether the model or the label was wrong.
   Commit: `Extend eval to six videos and tune the analysis`
 
+- [ ] **12. The infrastructure is rebuilt from Terraform**
+  Becomes usable: `terraform plan` shows no unexpected changes and `terraform apply` recreates the S3 bucket, DynamoDB table, ECR repository, both Lambdas with roles and log groups, the Function URL, the asynchronous-invoke settings and the Budget, with the Worker image pinned by digest.
+  Why now: Your plan puts it after a working end to end, so it can never delay the proof. It also makes the cleanup after judging a single command.
+  PRD ref: `prd.md > States and Boundaries` (privacy, daily limits)
+  Spec ref: `spec.md > Infrastructure (infra/)`, `spec.md > Amazon ECR, CloudWatch Logs, AWS Budgets`, `spec.md > After Submission`
+  Build: Terraform in `infra/` with local state kept outside the repository and `-var image_digest=...`; replace or import the spike resources without breaking the live site.
+  Verify (mechanical): `terraform validate` and `terraform plan` run clean; after apply, the end-to-end script from slice 8 still returns a valid result; no state file is tracked by git.
+  Learner check: Run the plan yourself and tell me whether the resources it lists are the ones you expect.
+  Commit: `Add Terraform for the backend infrastructure`
+
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — after slice 7 (the interface with the sample: look and click-to-seek)
+- [ ] Early usable behavior explored — after slice 5 (the interface with the sample: look and click-to-seek)
 - [ ] Public end-to-end explored — after slice 8 (your own video and someone else's through the live site)
 - [ ] Final kick-the-tires exploration and feedback completed
 
