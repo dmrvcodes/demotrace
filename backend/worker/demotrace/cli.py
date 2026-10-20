@@ -1,4 +1,8 @@
-"""Command line for the local pipeline: `python -m demotrace.cli prepare VIDEO --out DIR`."""
+"""Command line for the local pipeline. Run it from the repository root.
+
+    python -m demotrace.cli prepare VIDEO --out DIR
+    python -m demotrace.cli smoke [--video VIDEO --claims CLAIMS.json] [--profile AWS_PROFILE]
+"""
 
 import argparse
 import sys
@@ -7,13 +11,10 @@ from pathlib import Path
 from demotrace_shared.errors import ERROR_MESSAGES
 from demotrace_shared.limits import REQUEST_MAX_BYTES
 
+from .llm import ModelError
 from .media import MediaError
 from .prepare import prepare
-
-
-def mmss(t: float) -> str:
-    minutes, seconds = divmod(t, 60)
-    return f"{int(minutes):02d}:{seconds:04.1f}"
+from .timefmt import mmss
 
 
 def cmd_prepare(args: argparse.Namespace) -> int:
@@ -34,6 +35,38 @@ def cmd_prepare(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_smoke(args: argparse.Namespace) -> int:
+    from .llm.client import call_model, make_client
+    from .llm.fixtures import write_fixture
+    from .llm.prompt import build_request
+    from .smoke import describe, load_claims, load_frames, small_case
+
+    client = make_client(args.profile)
+    fixtures = Path(args.fixtures)
+    cases = []
+    if not args.skip_small:
+        cases.append(("smoke-small", *small_case()))
+    if args.video:
+        if not args.claims:
+            raise SystemExit("--claims is required with --video")
+        video = Path(args.video)
+        out_dir = Path(args.out) / video.stem
+        media = prepare(video, out_dir)
+        cases.append((args.name or video.stem, media, load_frames(out_dir, media), load_claims(Path(args.claims))))
+
+    for name, media, images, claims in cases:
+        request = build_request(media, images, claims)
+        print(f"\n== {name}: {len(media.frames)} frames, {len(media.segments)} segments, {len(claims)} claims, "
+              f"request {request.size_bytes / 2**20:.2f} MB")
+        result = call_model(client, request)
+        usage = result.usage
+        print(f"OK  stop_reason={result.stop_reason}  input_tokens={usage.get('input_tokens')}  "
+              f"output_tokens={usage.get('output_tokens')}  time={result.elapsed_s}s  request_id={result.request_id}")
+        print("\n".join(describe(claims, result.answer)))
+        print(f"Saved {write_fixture(fixtures, name, media, claims, request, result)}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="demotrace")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -45,12 +78,24 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--whisper-model", default=None, help="model size or local path (default: small.en)")
     p.set_defaults(func=cmd_prepare)
 
+    s = sub.add_parser("smoke", help="check the Bedrock call: a small request, then a realistic one with --video")
+    s.add_argument("--video", help="a real demo video for the realistic request")
+    s.add_argument("--claims", help="JSON file with 3–5 claims for --video")
+    s.add_argument("--name", help="fixture name for the realistic request (default: the video's file name)")
+    s.add_argument("--profile", default=None, help="AWS profile to use (default: the normal AWS chain)")
+    s.add_argument("--out", default="out/smoke", help="where prepared frames go")
+    s.add_argument("--fixtures", default="eval/fixtures", help="where answers are saved")
+    s.add_argument("--skip-small", action="store_true", help="only run the realistic request")
+    s.set_defaults(func=cmd_smoke)
+
     args = parser.parse_args(argv)
     try:
         return args.func(args)
-    except MediaError as err:
+    except (MediaError, ModelError) as err:
         detail = f" ({err.detail})" if err.detail else ""
-        print(f"error: {err.code}: {ERROR_MESSAGES.get(err.code, '')}{detail}", file=sys.stderr)
+        request_id = getattr(err, "request_id", None)
+        print(f"error: {err.code}: {ERROR_MESSAGES.get(err.code, '')}{detail}"
+              + (f" request_id={request_id}" if request_id else ""), file=sys.stderr)
         return 2
 
 
