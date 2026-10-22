@@ -27,9 +27,13 @@ export async function createJob(): Promise<CreatedJob> {
 }
 
 export async function uploadVideo(uploadUrl: string, token: string, file: File): Promise<void> {
+  const isControlApiUpload = new URL(uploadUrl).origin === new URL(apiBase).origin;
   const response = await fetch(uploadUrl, {
     method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": file.type || "video/mp4" },
+    headers: {
+      ...(isControlApiUpload ? { Authorization: `Bearer ${token}` } : {}),
+      "Content-Type": file.type || "video/mp4",
+    },
     body: file,
   });
   if (!response.ok) throw new Error(`Upload failed (${response.status})`);

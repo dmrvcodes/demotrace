@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 
 import pytest
 
@@ -47,7 +48,7 @@ def test_no_speech_is_said_plainly():
 
 def test_request_settings_follow_the_spec():
     params = build_request(media_with(1), [b"x"], ["A", "B", "C"]).params
-    assert params["model"] == "anthropic.claude-opus-5-5"
+    assert params["model"] == os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
     assert params["max_tokens"] == 16000
     assert params["output_config"] == {"effort": "high"}
     # Rejected or meaningless on Opus 5.5: sampling parameters, a thinking budget, forced tools.

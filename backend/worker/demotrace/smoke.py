@@ -1,4 +1,4 @@
-"""The Bedrock smoke test: one small request, then one realistic request built from a real video.
+"""The direct Claude smoke test: one small request, then one realistic request built from a real video.
 
 Together they check the five things from `spec.md > How We Verify`: the model answers,
 `messages.parse` with structured output works, effort `high` is accepted, the request size goes

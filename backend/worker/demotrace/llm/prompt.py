@@ -13,7 +13,7 @@ from demotrace_shared.media import Frame, PreparedMedia, SpeechSegment
 from ..timefmt import mmss
 from . import ModelError
 
-MODEL_ID = os.environ.get("MODEL_ID", "anthropic.claude-opus-5-5")
+MODEL_ID = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
 MAX_TOKENS = 16000
 EFFORT = "high"  # Opus 5.5 defaults to medium, so it is set explicitly
 

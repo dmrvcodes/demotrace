@@ -1,7 +1,7 @@
 """Command line for the local pipeline. Run it from the repository root.
 
     python -m demotrace.cli prepare VIDEO --out DIR
-    python -m demotrace.cli smoke [--video VIDEO --claims CLAIMS.json] [--profile AWS_PROFILE]
+    python -m demotrace.cli smoke [--video VIDEO --claims CLAIMS.json]
 """
 
 import argparse
@@ -11,7 +11,6 @@ from pathlib import Path
 from demotrace_shared.errors import ERROR_MESSAGES
 from demotrace_shared.limits import REQUEST_MAX_BYTES
 
-from . import awsguard
 from .llm import ModelError
 from .media import MediaError
 from .prepare import prepare
@@ -42,10 +41,7 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     from .llm.prompt import build_request
     from .smoke import describe, load_claims, load_frames, small_case
 
-    profile = awsguard.profile(args.profile)
-    account = awsguard.check_account(profile)  # before anything else touches AWS
-    print(f"AWS account {account} via profile {profile}: matches DEMOTRACE_AWS_ACCOUNT_ID")
-    client = make_client(profile)
+    client = make_client()
     fixtures = Path(args.fixtures)
     cases = []
     if not args.skip_small:
@@ -82,16 +78,16 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--whisper-model", default=None, help="model size or local path (default: small.en)")
     p.set_defaults(func=cmd_prepare)
 
-    s = sub.add_parser("smoke", help="check the Bedrock call: a small request, then a realistic one with --video")
+    s = sub.add_parser("smoke", help="check the direct Claude call, then a realistic one with --video")
     s.add_argument("--video", help="a real demo video for the realistic request")
     s.add_argument("--claims", help="JSON file with 3–5 claims for --video")
     s.add_argument("--name", help="fixture name for the realistic request (default: the video's file name)")
-    s.add_argument("--profile", default=None, help="AWS profile to use (default: AWS_PROFILE from .env)")
     s.add_argument("--out", default="out/smoke", help="where prepared frames go")
     s.add_argument("--fixtures", default="eval/fixtures", help="where answers are saved")
     s.add_argument("--skip-small", action="store_true", help="only run the realistic request")
     s.set_defaults(func=cmd_smoke)
 
+    from . import awsguard
     awsguard.load_env()  # local, gitignored .env in the directory you run from
     args = parser.parse_args(argv)
     try:
@@ -102,9 +98,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {err.code}: {ERROR_MESSAGES.get(err.code, '')}{detail}"
               + (f" request_id={request_id}" if request_id else ""), file=sys.stderr)
         return 2
-    except awsguard.WrongAccount as err:
-        print(f"error: {err}", file=sys.stderr)
-        return 3
 
 
 if __name__ == "__main__":

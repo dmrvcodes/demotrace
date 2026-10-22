@@ -69,6 +69,14 @@ def test_returns_the_parsed_answer_with_usage():
     assert sent["output_config"] == {"effort": "high"}
 
 
+def test_client_requires_an_api_key(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(ModelError) as err:
+        llm.make_client()
+    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE
+    assert "ANTHROPIC_API_KEY" in err.value.detail
+
+
 def test_refusal_fails_with_its_category():
     with pytest.raises(ModelError) as err:
         llm.call_model(StubClient(response("refusal", parsed=None, category="cyber")), request())

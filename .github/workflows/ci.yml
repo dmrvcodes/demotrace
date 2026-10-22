@@ -1,0 +1,41 @@
+name: CI and deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e backend/shared -e 'backend/worker[dev]' -e 'backend/control[dev]'
+      - run: PYTHONPATH=backend/worker:backend/shared:backend/control pytest -q backend/worker/tests backend/control/tests
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
+      - run: npm ci --prefix web
+      - run: npm run lint --prefix web && npm run build --prefix web
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra init -backend=false && terraform -chdir=infra validate
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra init && terraform -chdir=infra apply -auto-approve

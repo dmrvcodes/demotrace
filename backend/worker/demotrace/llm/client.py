@@ -1,4 +1,4 @@
-"""Call Claude Opus 5.5 on Amazon Bedrock with structured output, and turn every failure into a code."""
+"""Call Claude directly with structured output, and turn every failure into a code."""
 
 import math
 import os
@@ -15,7 +15,6 @@ from demotrace_shared.errors import ErrorCode
 from . import ModelError
 from .prompt import ModelRequest
 
-REGION = os.environ.get("AWS_REGION", "us-east-1")
 # One call must never eat the whole 15-minute Lambda budget, so no automatic SDK retries.
 TIMEOUT_S = 420
 RETRY_DELAY_S = 5
@@ -31,19 +30,12 @@ class ModelResult:
     elapsed_s: float
 
 
-def make_client(profile: str | None = None):
-    """Credentials come from the normal AWS chain: your profile locally, the function's role in Lambda."""
-    return anthropic.AnthropicBedrockMantle(
-        aws_region=REGION, aws_profile=profile, timeout=TIMEOUT_S, max_retries=0,
-    )
-
-
-def _credentials_error() -> tuple[type[BaseException], ...]:
-    try:
-        from botocore.exceptions import BotoCoreError
-        return (BotoCoreError,)
-    except ImportError:
-        return ()
+def make_client() -> anthropic.Anthropic:
+    """Create the direct Claude client without ever logging the API key."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ModelError(ErrorCode.MODEL_UNAVAILABLE, "ANTHROPIC_API_KEY is not set")
+    return anthropic.Anthropic(api_key=api_key, timeout=TIMEOUT_S, max_retries=0)
 
 
 def call_model(client, request: ModelRequest, *,
@@ -62,14 +54,12 @@ def call_model(client, request: ModelRequest, *,
                 continue
             raise ModelError(ErrorCode.MODEL_UNAVAILABLE, type(err).__name__) from err
         except (anthropic.AuthenticationError, anthropic.PermissionDeniedError, anthropic.NotFoundError) as err:
-            # Missing model access, a wrong IAM action or a wrong model ID: the message says which.
+            # Invalid credentials or model access are reported as a safe application error.
             raise ModelError(ErrorCode.MODEL_UNAVAILABLE, f"{type(err).__name__}: {err.message}") from err
         except anthropic.BadRequestError as err:
             raise ModelError(ErrorCode.MODEL_REJECTED_REQUEST, err.message) from err
         except pydantic.ValidationError as err:
             raise ModelError(ErrorCode.MODEL_INVALID_OUTPUT, str(err)[:300]) from err
-        except _credentials_error() as err:
-            raise ModelError(ErrorCode.MODEL_UNAVAILABLE, f"AWS credentials: {err}") from err
     elapsed = round(time.monotonic() - started, 1)
     request_id = getattr(response, "_request_id", None)
 
