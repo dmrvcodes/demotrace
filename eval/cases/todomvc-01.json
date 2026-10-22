@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "case_id": "todomvc-01",
+  "video": ".local/eval/videos/todomvc-01.mp4",
+  "duration_s": 65.0,
+  "source": "Scripted headless recording of https://demo.playwright.dev/todomvc, narration by Amazon Polly neural voice Arthur (en-GB)",
+  "speech_ranges_s": [
+    [
+      0.3,
+      2.5
+    ],
+    [
+      5.2,
+      8.2
+    ],
+    [
+      12.2,
+      13.4
+    ],
+    [
+      16.5,
+      17.9
+    ],
+    [
+      24.5,
+      26.6
+    ],
+    [
+      35.2,
+      37.5
+    ],
+    [
+      42.2,
+      43.6
+    ],
+    [
+      53.7,
+      56.7
+    ]
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "Adding a task increases the 'items left' counter.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          15.0,
+          22.0
+        ]
+      ],
+      "negative": null,
+      "note": "Enter at 16.0: list gains 'Prepare demo', counter goes from '1 item left' to '2 items left'."
+    },
+    {
+      "id": "C2",
+      "text": "The Active filter hides completed tasks.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          23.5,
+          32.0
+        ]
+      ],
+      "negative": null,
+      "note": "Click on Active at 24.0: completed 'Book flights' disappears from the list."
+    },
+    {
+      "id": "C3",
+      "text": "'Clear completed' removes all finished tasks.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          34.0,
+          42.0
+        ]
+      ],
+      "negative": "similar_ui_no_result",
+      "note": "Narrated at 35.2 while the cursor hovers the button; it is never clicked, the list never changes."
+    },
+    {
+      "id": "C4",
+      "text": "Users get due-date reminders.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          43.5,
+          53.0
+        ]
+      ],
+      "negative": "promise_slide",
+      "note": "Only a 'Coming soon: due-date reminders' slide, no narration about it."
+    },
+    {
+      "id": "C5",
+      "text": "Tasks can be exported to CSV.",
+      "expected": "missing",
+      "evidence_ranges_s": [],
+      "negative": null,
+      "note": "Never mentioned or shown."
+    }
+  ]
+}

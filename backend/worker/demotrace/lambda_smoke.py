@@ -60,12 +60,15 @@ def run(session, account: str, video: Path, claims: Sequence[str], *, region: st
     else:
         print(f"error: {item.get('error_code')} at stage {item.get('failed_stage')}")
 
-    time.sleep(3)  # let the log line land
-    events = logs.filter_log_events(logGroupName=f"/aws/lambda/{function}", filterPattern=f'"{job_id}"',
-                                    startTime=(now - 60) * 1000).get("events", [])
-    for event in events:
-        if '"event":"demotrace_job"' in event["message"]:
-            print(f"worker log: {event['message'].strip()}")
+    line = None
+    for _ in range(12):  # CloudWatch can take a little while to deliver the line
+        events = logs.filter_log_events(logGroupName=f"/aws/lambda/{function}", filterPattern=f'"{job_id}"',
+                                        startTime=(now - 60) * 1000).get("events", [])
+        line = next((e["message"].strip() for e in events if '"event":"demotrace_job"' in e["message"]), None)
+        if line:
+            break
+        time.sleep(POLL_S)
+    print(f"worker log: {line or '(not delivered yet)'}")
     left = s3.list_object_versions(Bucket=bucket, Prefix=key)
     remaining = len(left.get("Versions", [])) + len(left.get("DeleteMarkers", []))
     print(f"S3 versions or delete markers left under {key}: {remaining}")
