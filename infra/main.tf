@@ -5,6 +5,7 @@ terraform {
 
 provider "aws" { region = "us-east-1" }
 data "aws_caller_identity" "current" {}
+variable "anthropic_model" { default = "claude-sonnet-4-5-20250929" }
 
 locals {
   bucket = "demotrace-${data.aws_caller_identity.current.account_id}-us-east-1"
@@ -54,6 +55,56 @@ resource "aws_secretsmanager_secret" "anthropic" {
   name                    = "demotrace/anthropic-api-key"
   recovery_window_in_days = 0
 }
+
+locals {
+  lambda_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "lambda.amazonaws.com" }, Action = "sts:AssumeRole" }] })
+  github_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Federated = aws_iam_openid_connect_provider.github.arn }, Action = "sts:AssumeRoleWithWebIdentity", Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = "repo:dmrvcodes/demotrace:ref:refs/heads/main" } } }] })
+}
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["ffffffffffffffffffffffffffffffffffffffff"]
+}
+resource "aws_iam_role" "github_deploy" {
+  name               = "demotrace-github-deploy"
+  assume_role_policy = local.github_assume
+}
+resource "aws_iam_role_policy" "github_deploy" {
+  name   = "demotrace-deploy-only"
+  role   = aws_iam_role.github_deploy.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["s3:*", "dynamodb:*", "ecr:*", "lambda:*", "logs:*", "iam:GetRole", "iam:CreateRole", "iam:DeleteRole", "iam:PassRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "secretsmanager:DescribeSecret"], Resource = "*" }] })
+}
+
+resource "aws_iam_role" "worker" {
+  name               = "demotrace-worker"
+  assume_role_policy = local.lambda_assume
+}
+resource "aws_iam_role_policy_attachment" "worker_logs" {
+  role       = aws_iam_role.worker.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+resource "aws_iam_role_policy" "worker" {
+  name = "data-and-secret"
+  role = aws_iam_role.worker.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["s3:GetObjectVersion", "s3:DeleteObjectVersion"], Resource = "${aws_s3_bucket.videos.arn}/incoming/*" },
+    { Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"], Resource = aws_dynamodb_table.jobs.arn },
+    { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = aws_secretsmanager_secret.anthropic.arn }
+  ] })
+}
+resource "aws_lambda_function" "worker" {
+  function_name                  = "demotrace-worker"
+  role                           = aws_iam_role.worker.arn
+  package_type                   = "Image"
+  image_uri                      = "${aws_ecr_repository.worker.repository_url}:latest"
+  architectures                  = ["arm64"]
+  timeout                        = 900
+  memory_size                    = 3008
+  environment { variables = { JOBS_TABLE_NAME = aws_dynamodb_table.jobs.name, VIDEOS_BUCKET_NAME = aws_s3_bucket.videos.id, ANTHROPIC_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn, ANTHROPIC_MODEL = var.anthropic_model } }
+}
+
+output "github_deploy_role_arn" { value = aws_iam_role.github_deploy.arn }
 
 output "videos_bucket" { value = aws_s3_bucket.videos.id }
 output "jobs_table" { value = aws_dynamodb_table.jobs.name }

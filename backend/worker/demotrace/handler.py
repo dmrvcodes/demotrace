@@ -43,6 +43,7 @@ def handler(event, context):
             table.update_item(Key={"pk": f"JOB#{job_id}"}, UpdateExpression="SET #s=:completed, result=:result, finished_at=:now", ConditionExpression="#s=:processing", ExpressionAttributeNames={"#s":"status"}, ExpressionAttributeValues={":completed":"completed",":processing":"processing",":result":_dynamo({"schema_version":1,"duration_s":media.duration_s,"claims":results}),":now":int(time.time())})
     except (ModelError, MediaError, Exception) as error:
         code = error.code if isinstance(error, (ModelError, MediaError)) else ErrorCode.MODEL_UNAVAILABLE
+        print(f"job={job_id} failed error_type={type(error).__name__} code={code}")
         table.update_item(Key={"pk": f"JOB#{job_id}"}, UpdateExpression="SET #s=:failed, error_code=:code, error_message=:message", ExpressionAttributeNames={"#s":"status"}, ExpressionAttributeValues={":failed":"failed",":code":str(code),":message":ERROR_MESSAGES[code]})
     finally:
         try: s3.delete_object(Bucket=os.environ["VIDEOS_BUCKET_NAME"], Key=key, VersionId=version)
