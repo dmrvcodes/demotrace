@@ -9,6 +9,7 @@ type ResultsViewProps = {
   onTimeUpdate: (seconds: number) => void;
   onRecheck: () => void;
   result: AnalysisResult;
+  videoSrc: string;
   videoRef: React.RefObject<HTMLVideoElement | null>;
 };
 
@@ -19,6 +20,7 @@ export function ResultsView({
   onTimeUpdate,
   onRecheck,
   result,
+  videoSrc,
   videoRef,
 }: ResultsViewProps) {
   return (
@@ -37,7 +39,7 @@ export function ResultsView({
             onTimeUpdate={(event) => onTimeUpdate(event.currentTarget.currentTime)}
             preload="metadata"
             ref={videoRef}
-            src="/samples/demotrace-sample.mp4"
+            src={videoSrc}
           >
             <track kind="captions" />
           </video>
@@ -55,8 +57,8 @@ export function ResultsView({
         {result.claims.map((claim) => (
           <ClaimCard
             claim={claim}
-            isActive={claim.claimId === activeClaimId}
-            key={claim.claimId}
+            isActive={claim.claim_id === activeClaimId}
+            key={claim.claim_id}
             onEvidenceClick={onEvidenceClick}
           />
         ))}

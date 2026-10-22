@@ -1,11 +1,11 @@
 import type { AnalysisResult } from "./types";
 
 export const sampleAnalysis: AnalysisResult = {
-  schemaVersion: 1,
-  durationS: 90,
+  schema_version: 1,
+  duration_s: 90,
   claims: [
     {
-      claimId: "C1",
+      claim_id: "C1",
       text: "The video visibly shows a rabbit on screen.",
       status: "shown",
       explanation:
@@ -13,7 +13,7 @@ export const sampleAnalysis: AnalysisResult = {
       evidence: [{ refId: "F034", kind: "frame", t: 34 }],
     },
     {
-      claimId: "C2",
+      claim_id: "C2",
       text: "The app exports reports to Markdown.",
       status: "told_only",
       explanation:
@@ -21,7 +21,7 @@ export const sampleAnalysis: AnalysisResult = {
       evidence: [{ refId: "F002", kind: "frame", t: 2 }],
     },
     {
-      claimId: "C3",
+      claim_id: "C3",
       text: "The app supports team invitations.",
       status: "missing",
       explanation:

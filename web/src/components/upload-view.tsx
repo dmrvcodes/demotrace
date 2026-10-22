@@ -1,8 +1,11 @@
 type UploadViewProps = {
+  error: string | null;
+  fileName: string | null;
+  onFileSelected: (file: File) => void;
   onTrySample: () => void;
 };
 
-export function UploadView({ onTrySample }: UploadViewProps) {
+export function UploadView({ error, fileName, onFileSelected, onTrySample }: UploadViewProps) {
   return (
     <section className="upload-view" aria-labelledby="upload-title">
       <div className="upload-view__intro">
@@ -16,9 +19,9 @@ export function UploadView({ onTrySample }: UploadViewProps) {
         <span className="drop-zone__icon" aria-hidden="true">↑</span>
         <h2>Drop an MP4 demo</h2>
         <p>Up to 3 minutes · English narration only · H.264 MP4 recommended</p>
-        <button className="primary-button" disabled type="button">
-          Upload coming next
-        </button>
+        <label className="secondary-button upload-button">{fileName ?? "Choose video"}<input accept="video/mp4,video/quicktime" onChange={(event) => { const [file] = Array.from(event.target.files ?? []); if (file) onFileSelected(file); }} type="file" /></label>
+        {fileName && <p className="upload-ready">Ready: {fileName}</p>}
+        {error && <p className="error-message">{error}</p>}
       </div>
       <div className="sample-cta">
         <div>

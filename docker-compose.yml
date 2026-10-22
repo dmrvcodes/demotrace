@@ -1,0 +1,11 @@
+services:
+  control:
+    build:
+      context: .
+      dockerfile: backend/control/Dockerfile
+    environment:
+      DEMOTRACE_LOCAL_DATA: /data
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.local/demotrace:/data

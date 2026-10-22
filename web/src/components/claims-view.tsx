@@ -1,0 +1,6 @@
+type ClaimsViewProps = { claims: string[]; onChange: (claims: string[]) => void; onStart: () => void; busy: boolean; error: string | null };
+export function ClaimsView({ claims, onChange, onStart, busy, error }: ClaimsViewProps) {
+  const update = (index: number, value: string) => onChange(claims.map((claim, i) => i === index ? value : claim));
+  const valid = claims.length >= 3 && claims.length <= 5 && claims.every((claim) => claim.trim());
+  return <section className="upload-view" aria-labelledby="claims-title"><p className="eyebrow">Step 2 of 4</p><h1 id="claims-title">What should the demo prove?</h1><p className="claims-hint">Write observable results, not promises. DemoTrace checks what appears on screen.</p><div className="claims-form">{claims.map((claim, index) => <label key={index}>Claim {index + 1}<input value={claim} onChange={(event) => update(index, event.target.value)} placeholder="The user can do X and sees Y" /></label>)}</div>{claims.length < 5 && <button className="text-button" onClick={() => onChange([...claims, ""])} type="button">+ Add claim</button>}{error && <p className="error-message">{error}</p>}<button className="primary-button primary-button--active" disabled={!valid || busy} onClick={onStart} type="button">{busy ? "Starting…" : "Start analysis"}</button></section>;
+}

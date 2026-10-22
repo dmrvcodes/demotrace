@@ -11,6 +11,7 @@
 *.tfstate.*
 .terraform/
 *.tfplan
+.local/
 
 # Test videos and eval run outputs
 *.mp4

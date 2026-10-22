@@ -7,7 +7,7 @@ export type Evidence = {
 };
 
 export type ClaimResult = {
-  claimId: string;
+  claim_id: string;
   text: string;
   status: ClaimStatus;
   explanation: string;
@@ -15,7 +15,7 @@ export type ClaimResult = {
 };
 
 export type AnalysisResult = {
-  schemaVersion: number;
-  durationS: number;
+  schema_version: number;
+  duration_s: number;
   claims: ClaimResult[];
 };

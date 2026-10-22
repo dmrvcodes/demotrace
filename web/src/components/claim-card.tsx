@@ -15,7 +15,7 @@ export function ClaimCard({ claim, isActive, onEvidenceClick }: ClaimCardProps) 
       aria-current={isActive ? "true" : undefined}
     >
       <div className="claim-card__header">
-        <p className="claim-card__id">{claim.claimId}</p>
+      <p className="claim-card__id">{claim.claim_id}</p>
         <StatusBadge status={claim.status} />
       </div>
       <h3>{claim.text}</h3>
@@ -26,7 +26,7 @@ export function ClaimCard({ claim, isActive, onEvidenceClick }: ClaimCardProps) 
             <button
               className="timestamp-button"
               key={evidence.refId}
-              onClick={() => onEvidenceClick(claim.claimId, evidence.t)}
+              onClick={() => onEvidenceClick(claim.claim_id, evidence.t)}
               type="button"
             >
               [{formatTimestamp(evidence.t)}]
