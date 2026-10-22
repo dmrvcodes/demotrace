@@ -49,12 +49,12 @@ Build mode: fast
   Learner check: Label the 3 videos with me (statuses and time ranges), run the gate, and tell me whether the failures it reports match your own judgement.
   Commit: `Add labelled eval cases and quality gate runner`
 
-- [ ] **5. The interface works end to end on the sample**
+- [x] **5. The interface works end to end on the sample**
   Becomes usable: The four steps in the browser in the dark look from the PRD. **Try with sample** opens Results with the video, the timeline and one card per claim; clicking a timestamp or a marker moves the player and highlights the card; the "AI assessment" note is visible.
   Why now: After slices 1–4 you already have a real result from your own pipeline, so the Results screen, the timeline and click-to-seek can be built on it right away. Design is a quarter of the judging, so the look and the core interaction come early, while feedback can still shape the rest, and an early weak demo can be shown. Fixture mode needs no AWS.
   PRD ref: `prd.md > Results and evidence`, `prd.md > Try with sample`, `prd.md > Look and Feel`, `prd.md > Screens and Layout`
   Spec ref: `spec.md > Web app shell`, `spec.md > Results view`, `spec.md > Sample mode and fixtures`, `spec.md > Look and Feel`
-  Build: Scaffold the Next.js app in `web/` (TypeScript, Tailwind, Inter and Geist Mono through `next/font`); theme tokens from the spec; `StatusBadge`, `ClaimCard`, `VideoPlayer`, `Timeline`; `sample.json` from the real result your own pipeline produced in slices 2–4, and `sample.mp4`, a short clip you own and agree to publish, with a `.gitignore` exception for `web/public/samples/` only; the Upload, Claims and Waiting steps as shells.
+  Build: Scaffold the Next.js app in `web/` (TypeScript, Tailwind, Inter and Geist Mono through `next/font`); theme tokens from the spec; `StatusBadge`, `ClaimCard`, `VideoPlayer`, `Timeline`; a schema-checked local sample fixture until Bedrock becomes available (then replace it with a real recorded pipeline result), and a short sample clip with an explicit redistribution licence and attribution, with a `.gitignore` exception for `web/public/samples/` only; the Upload, Claims and Waiting steps as shells.
   Verify (mechanical): `npm run build` and the linter pass; start the dev server, load the page in the browser pane, click **Try with sample**, check that a timestamp click sets the player time and highlights the card, and check the colors and fonts against the tokens.
   Learner check: Open `http://localhost:3000`, click **Try with sample**, click timestamps and markers, and say whether the look matches what you pictured.
   Commit: `Add interface with sample results, timeline and click-to-seek`
@@ -154,4 +154,4 @@ Activity mode: [live app and editor, explicit static fallback, focused alternati
 ## Revisions
 
 - De-duplication now needs both the perceptual hash and a changed-pixel check on a colour thumbnail to call two frames duplicates (`spec.md > Worker pipeline`, `backend/worker/demotrace/media/dedupe.py`) — the build found that the perceptual hash gives a red and a blue screen the same hash, so a colour-only change such as a status turning green would have been thrown away as a duplicate.
-
+- Bedrock inference is account-blocked (`Operation not allowed` for Amazon Nova and 403 for Claude), so the temporary execution order is slice 5 before slices 2–4. This preserves the product boundary and gives a local, reviewable interface while AWS Support resolves access. The sample starts as a schema-checked local fixture and must be replaced with a recorded model result before the eval/public-submission gate.

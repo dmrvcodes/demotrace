@@ -18,6 +18,7 @@
 *.m4v
 *.webm
 *.mkv
+!web/public/samples/demotrace-sample.mp4
 /eval/runs/
 
 # Python

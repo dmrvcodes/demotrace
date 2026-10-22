@@ -122,7 +122,7 @@ PRD ref: `prd.md > Results and evidence`, `prd.md > Re-checking after a re-recor
 PRD ref: `prd.md > Returning to a result`.
 
 ### Sample mode and fixtures
-`NEXT_PUBLIC_API_MODE=fixture` makes the API client return `web/public/samples/sample.json` after a short delay, so the same Results view renders it. The sample result is a real recorded model response for the sample video, and the interface labels it as a sample analysis.
+The local fixture mode loads `src/lib/sample.ts` and `/public/samples/demotrace-sample.mp4`, so the same Results view renders without an API call. Until Bedrock inference is enabled for this account, the sample result is a schema-checked local fixture with deliberately traceable frame evidence; it is labelled as a sample analysis. It is replaced with a recorded model response for the same sample video before the quality gate and public submission.
 PRD ref: `prd.md > Try with sample`.
 
 ### Control API (FastAPI)
