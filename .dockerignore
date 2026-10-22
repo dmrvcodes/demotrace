@@ -1,0 +1,6 @@
+# Images only need backend/; keep secrets, videos and heavy local folders out of the build context.
+*
+!backend/
+backend/**/__pycache__
+backend/**/*.egg-info
+backend/**/.pytest_cache

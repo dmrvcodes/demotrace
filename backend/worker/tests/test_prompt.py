@@ -48,10 +48,10 @@ def test_no_speech_is_said_plainly():
 
 def test_request_settings_follow_the_spec():
     params = build_request(media_with(1), [b"x"], ["A", "B", "C"]).params
-    assert params["model"] == os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
+    assert params["model"] == os.environ["ANTHROPIC_MODEL"]
     assert params["max_tokens"] == 16000
     assert params["output_config"] == {"effort": "high"}
-    # Rejected or meaningless on Opus 5.5: sampling parameters, a thinking budget, forced tools.
+    # Rejected or meaningless on current models: sampling parameters, a thinking budget, forced tools.
     assert not {"temperature", "top_p", "top_k", "thinking", "tools", "tool_choice"} & params.keys()
 
 
@@ -76,3 +76,10 @@ def test_small_smoke_case_builds():
     media, images, claims = small_case()
     req = build_request(media, images, claims)
     assert req.size_bytes < 200_000 and len(claims) == 2
+
+
+def test_model_must_be_configured(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
+    with pytest.raises(ModelError) as err:
+        build_request(media_with(1), [b"x"], ["A", "B", "C"])
+    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE and "ANTHROPIC_MODEL" in err.value.detail

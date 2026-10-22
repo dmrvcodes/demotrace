@@ -2,6 +2,7 @@
 
     python -m demotrace.cli prepare VIDEO --out DIR
     python -m demotrace.cli smoke [--video VIDEO --claims CLAIMS.json]
+    python -m demotrace.cli lambda-smoke VIDEO --claims CLAIMS.json [--profile AWS_PROFILE]
 """
 
 import argparse
@@ -67,6 +68,19 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lambda_smoke(args: argparse.Namespace) -> int:
+    import boto3
+
+    from . import awsguard
+    from .lambda_smoke import run
+    from .smoke import load_claims
+
+    profile = awsguard.profile(args.profile)
+    account = awsguard.check_account(profile)  # before anything else touches AWS
+    print(f"AWS account {account} via profile {profile}: matches DEMOTRACE_AWS_ACCOUNT_ID")
+    return run(boto3.Session(profile_name=profile), account, Path(args.video), load_claims(Path(args.claims)))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="demotrace")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -87,6 +101,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--skip-small", action="store_true", help="only run the realistic request")
     s.set_defaults(func=cmd_smoke)
 
+    ls = sub.add_parser("lambda-smoke", help="run one job through the deployed worker Lambda (one paid model call)")
+    ls.add_argument("video")
+    ls.add_argument("--claims", required=True, help="JSON file with 3–5 claims")
+    ls.add_argument("--profile", default=None, help="AWS profile (default: AWS_PROFILE from .env)")
+    ls.set_defaults(func=cmd_lambda_smoke)
+
     from . import awsguard
     awsguard.load_env()  # local, gitignored .env in the directory you run from
     args = parser.parse_args(argv)
@@ -98,6 +118,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {err.code}: {ERROR_MESSAGES.get(err.code, '')}{detail}"
               + (f" request_id={request_id}" if request_id else ""), file=sys.stderr)
         return 2
+    except awsguard.WrongAccount as err:
+        print(f"error: {err}", file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":

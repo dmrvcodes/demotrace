@@ -5,7 +5,19 @@ terraform {
 
 provider "aws" { region = "us-east-1" }
 data "aws_caller_identity" "current" {}
-variable "anthropic_model" { default = "claude-sonnet-4-5-20250929" }
+variable "anthropic_model" {
+  description = "The one place the model is chosen; the worker reads it as ANTHROPIC_MODEL."
+  type        = string
+  default     = "claude-sonnet-4-6"
+}
+variable "worker_image_digest" {
+  description = "sha256 digest of the worker image in ECR; deploys are pinned to it, never to a tag."
+  type        = string
+  validation {
+    condition     = can(regex("^sha256:[0-9a-f]{64}$", var.worker_image_digest))
+    error_message = "worker_image_digest must look like sha256:<64 hex>."
+  }
+}
 
 locals {
   bucket = "demotrace-${data.aws_caller_identity.current.account_id}-us-east-1"
@@ -94,13 +106,14 @@ resource "aws_iam_role_policy" "worker" {
   ] })
 }
 resource "aws_lambda_function" "worker" {
-  function_name                  = "demotrace-worker"
-  role                           = aws_iam_role.worker.arn
-  package_type                   = "Image"
-  image_uri                      = "${aws_ecr_repository.worker.repository_url}:latest"
-  architectures                  = ["arm64"]
-  timeout                        = 900
-  memory_size                    = 3008
+  function_name = "demotrace-worker"
+  role          = aws_iam_role.worker.arn
+  package_type  = "Image"
+  image_uri     = "${aws_ecr_repository.worker.repository_url}@${var.worker_image_digest}"
+  architectures = ["arm64"]
+  timeout       = 900
+  memory_size   = 3008
+  ephemeral_storage { size = 2048 } # video up to 150 MB plus frames and audio in /tmp
   environment { variables = { JOBS_TABLE_NAME = aws_dynamodb_table.jobs.name, VIDEOS_BUCKET_NAME = aws_s3_bucket.videos.id, ANTHROPIC_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn, ANTHROPIC_MODEL = var.anthropic_model } }
 }
 

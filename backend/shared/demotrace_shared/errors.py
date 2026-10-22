@@ -12,6 +12,8 @@ class ErrorCode(StrEnum):
     MODEL_UNAVAILABLE = "model_unavailable"
     MODEL_REJECTED_REQUEST = "model_rejected_request"
     MODEL_INVALID_OUTPUT = "model_invalid_output"
+    STORAGE_ERROR = "storage_error"
+    INTERNAL_ERROR = "internal_error"
 
 
 _TRY_AGAIN = "The analysis could not be completed — please try again."
@@ -25,4 +27,6 @@ ERROR_MESSAGES: dict[ErrorCode, str] = {
     ErrorCode.MODEL_UNAVAILABLE: _TRY_AGAIN,
     ErrorCode.MODEL_REJECTED_REQUEST: _TRY_AGAIN,
     ErrorCode.MODEL_INVALID_OUTPUT: _TRY_AGAIN,
+    ErrorCode.STORAGE_ERROR: _TRY_AGAIN,
+    ErrorCode.INTERNAL_ERROR: _TRY_AGAIN,
 }

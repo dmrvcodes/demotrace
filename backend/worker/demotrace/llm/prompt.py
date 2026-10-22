@@ -13,9 +13,20 @@ from demotrace_shared.media import Frame, PreparedMedia, SpeechSegment
 from ..timefmt import mmss
 from . import ModelError
 
-MODEL_ID = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929")
 MAX_TOKENS = 16000
-EFFORT = "high"  # Opus 5.5 defaults to medium, so it is set explicitly
+EFFORT = "high"  # set explicitly: the default differs between models
+
+
+def model_id() -> str:
+    """The model comes from one place: Terraform's `anthropic_model` → the Lambda's ANTHROPIC_MODEL.
+
+    Locally it is read from the same variable (in the gitignored .env). There is no default, so a
+    stale model name can never be used silently.
+    """
+    value = os.environ.get("ANTHROPIC_MODEL", "").strip()
+    if not value:
+        raise ModelError(ErrorCode.MODEL_UNAVAILABLE, "ANTHROPIC_MODEL is not set")
+    return value
 
 SYSTEM_PROMPT = """\
 You check whether a product demo video proves the claims its author makes about the product.
@@ -94,7 +105,7 @@ def build_request(media: PreparedMedia, images: Sequence[bytes], claims: Sequenc
     })
 
     params = {
-        "model": MODEL_ID,
+        "model": model_id(),
         "max_tokens": MAX_TOKENS,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": content}],

@@ -3,7 +3,12 @@
 import subprocess
 from pathlib import Path
 
+import os
+
 import pytest
+
+# The model always comes from ANTHROPIC_MODEL; tests use a fixed placeholder.
+os.environ.setdefault("ANTHROPIC_MODEL", "test-model")
 
 
 def _encoders() -> str:

@@ -13,6 +13,7 @@ from demotrace_shared.media import Frame, PreparedMedia
 from .media import MediaError, budget, dedupe
 from .media.frames import extract_candidates
 from .media.probe import probe
+from .stages import StageTracker, stage_of
 from .stt import transcribe as stt
 
 # Room kept in the request for the instructions, the claims and the labels around the transcript.
@@ -20,8 +21,17 @@ PROMPT_RESERVE_BYTES = 32 * 1024
 
 
 def prepare(video: Path, out_dir: Path, *, with_speech: bool = True,
-            whisper_model: str | None = None) -> PreparedMedia:
-    """Write `out_dir/frames/F001.jpg…` and `out_dir/media.json`, and return the same data."""
+            whisper_model: str | None = None, tracker: StageTracker | None = None) -> PreparedMedia:
+    """Write `out_dir/frames/F001.jpg…` and `out_dir/media.json`, and return the same data.
+
+    With a `tracker`, frame work is timed as the "prepare" stage and speech as "transcribe".
+    """
+    stage = stage_of(tracker)
+    with stage("prepare"):
+        return _prepare(video, out_dir, with_speech, whisper_model, stage)
+
+
+def _prepare(video: Path, out_dir: Path, with_speech: bool, whisper_model: str | None, stage) -> PreparedMedia:
     info = probe(video)
     frames_dir = out_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
@@ -39,7 +49,8 @@ def prepare(video: Path, out_dir: Path, *, with_speech: bool = True,
             MAX_FRAMES,
         )
 
-        segments = stt.transcribe(video, info, tmp, name=whisper_model) if with_speech else []
+        with stage("transcribe"):
+            segments = stt.transcribe(video, info, tmp, name=whisper_model) if with_speech else []
         transcript_bytes = len(json.dumps([s.model_dump() for s in segments]).encode())
 
         fitted = budget.fit(
