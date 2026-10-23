@@ -90,6 +90,49 @@ class Worker:
         self.events.append(kwargs)
 
 
+class DynamoDB:
+    """Small transaction-aware fake for the two writes in `analyze`."""
+
+    def __init__(self, table: Table):
+        self.table = table
+        self.transactions: list[dict] = []
+
+    @staticmethod
+    def _value(value: dict):
+        kind, raw = next(iter(value.items()))
+        if kind == "S":
+            return raw
+        if kind == "N":
+            return int(raw)
+        if kind == "L":
+            return [DynamoDB._value(item) for item in raw]
+        raise AssertionError(f"unsupported DynamoDB value {value}")
+
+    def transact_write_items(self, *, TransactItems):
+        self.transactions.append({"TransactItems": TransactItems})
+        job_update, limit_update = (item["Update"] for item in TransactItems)
+        job_pk = self._value(job_update["Key"]["pk"])
+        job = self.table.items[job_pk]
+        job_values = {key: self._value(value) for key, value in job_update["ExpressionAttributeValues"].items()}
+        limit_values = {key: self._value(value) for key, value in limit_update["ExpressionAttributeValues"].items()}
+        limit_pk = self._value(limit_update["Key"]["pk"])
+        limit = self.table.items.get(limit_pk, {"pk": limit_pk, "analyses": 0})
+        reasons = [{"Code": "None"}, {"Code": "None"}]
+        if job["status"] != job_values[":created"] or job["expires_at"] <= job_values[":now"]:
+            reasons[0] = {"Code": "ConditionalCheckFailed"}
+        if limit["analyses"] >= limit_values[":limit"]:
+            reasons[1] = {"Code": "ConditionalCheckFailed"}
+        if any(reason["Code"] != "None" for reason in reasons):
+            raise ClientError({"Error": {"Code": "TransactionCanceledException"}, "CancellationReasons": reasons}, "TransactWriteItems")
+        job.update({
+            "status": job_values[":queued"], "claims": job_values[":claims"],
+            "version_id": job_values[":version"], "queued_at": job_values[":now"],
+            "expires_at": job_values[":expires"],
+        })
+        limit.update({"analyses": limit["analyses"] + limit_values[":one"], "ttl": limit_values[":ttl"]})
+        self.table.items[limit_pk] = limit
+
+
 def event(method: str, path: str, body: dict | None = None, token: str | None = None) -> dict:
     headers = {"authorization": f"Bearer {token}"} if token else {}
     return {"requestContext": {"http": {"method": method}}, "rawPath": path, "headers": headers, "body": json.dumps(body) if body else None}
@@ -97,7 +140,8 @@ def event(method: str, path: str, body: dict | None = None, token: str | None = 
 
 def setup(monkeypatch, worker_error: ClientError | None = None):
     table, s3, worker = Table(), S3(), Worker(worker_error)
-    monkeypatch.setattr(handler, "boto3", SimpleNamespace(resource=lambda _: SimpleNamespace(Table=lambda _: table), client=lambda name: {"s3": s3, "lambda": worker}[name]))
+    dynamodb = DynamoDB(table)
+    monkeypatch.setattr(handler, "boto3", SimpleNamespace(resource=lambda _: SimpleNamespace(Table=lambda _: table), client=lambda name: {"s3": s3, "lambda": worker, "dynamodb": dynamodb}[name]))
     monkeypatch.setattr(handler.time, "time", lambda: 1_000)
     monkeypatch.setenv("JOBS_TABLE_NAME", "jobs")
     monkeypatch.setenv("VIDEOS_BUCKET_NAME", "videos")
@@ -157,6 +201,21 @@ def test_daily_capacity_stops_before_queueing(monkeypatch):
     assert response["statusCode"] == 429
     assert table.items[f"JOB#{second['job_id']}"]["status"] == "created"
     assert len(worker.events) == 1
+
+
+def test_failed_duplicate_submit_does_not_consume_capacity(monkeypatch):
+    table, _s3, _worker, body = create(monkeypatch)
+    monkeypatch.setenv("MAX_DAILY_ANALYSES", "1")
+    first = handler.handler(event("POST", f"/jobs/{body['job_id']}/analyze", {"claims": ["one", "two", "three"]}, body["job_token"]), None)
+    duplicate = handler.handler(event("POST", f"/jobs/{body['job_id']}/analyze", {"claims": ["one", "two", "three"]}, body["job_token"]), None)
+    assert first["statusCode"] == 200 and duplicate["statusCode"] == 409
+    assert table.items["LIMIT#1970-01-01"]["analyses"] == 1
+
+
+def test_queue_extends_job_expiry_from_dispatch_time(monkeypatch):
+    table, _s3, _worker, body = create(monkeypatch)
+    handler.handler(event("POST", f"/jobs/{body['job_id']}/analyze", {"claims": ["one", "two", "three"]}, body["job_token"]), None)
+    assert table.items[f"JOB#{body['job_id']}"]["expires_at"] == 1_000 + handler.JOB_TIMEOUT_SECONDS
 
 
 def test_job_json_serializes_dynamodb_decimals():

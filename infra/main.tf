@@ -133,8 +133,9 @@ resource "aws_iam_role_policy" "github_deploy" {
     { Effect = "Allow", Action = ["lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:PutFunctionEventInvokeConfig", "lambda:UpdateFunctionUrlConfig"], Resource = [aws_lambda_function.worker.arn, aws_lambda_function.control.arn] },
     { Effect = "Allow", Action = ["dynamodb:UpdateTable", "dynamodb:UpdateTimeToLive"], Resource = aws_dynamodb_table.jobs.arn },
     { Effect = "Allow", Action = ["logs:PutRetentionPolicy"], Resource = "arn:aws:logs:us-east-1:623588627433:log-group:/aws/lambda/demotrace-*" },
-    { Effect = "Allow", Action = ["iam:PassRole"], Resource = [aws_iam_role.worker.arn, aws_iam_role.control.arn], Condition = { StringEquals = { "iam:PassedToService" = "lambda.amazonaws.com" } } },
-    { Effect = "Allow", Action = ["iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy"], Resource = [aws_iam_role.worker.arn, aws_iam_role.control.arn] }
+    # IAM policies are intentionally outside the CI role's write surface. Even with a scoped
+    # Lambda update permission, policy mutation plus code update becomes privilege escalation.
+    # Adjust execution-role permissions only from the account-admin Terraform session.
   ] })
 }
 
@@ -236,6 +237,9 @@ resource "aws_lambda_function" "worker" {
   architectures = ["arm64"]
   timeout       = 900
   memory_size   = 3008
+  # A tiny public proof of concept: absorb short bursts without allowing a cost spike or
+  # multiple whisper containers to contend for the account's constrained Lambda capacity.
+  reserved_concurrent_executions = 2
   ephemeral_storage { size = 2048 } # video up to 150 MB plus frames and audio in /tmp
   environment { variables = { JOBS_TABLE_NAME = aws_dynamodb_table.jobs.name, VIDEOS_BUCKET_NAME = aws_s3_bucket.videos.id, ANTHROPIC_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn, ANTHROPIC_MODEL = var.anthropic_model } }
 }

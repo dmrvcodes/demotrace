@@ -153,6 +153,21 @@ Activity mode: [live app and editor, explicit static fallback, focused alternati
 
 ## Revisions
 
+- 23 October — Bedrock remained account-blocked, so the deployed Worker uses the authorized
+  direct Anthropic API credential held in AWS Secrets Manager. The live Control API is a
+  dependency-free Lambda Function URL handler rather than FastAPI/Mangum; it creates constrained
+  presigned S3 POSTs, uses DynamoDB conditional transitions and a transaction for
+  `CREATED → QUEUED` plus daily capacity, then invokes the arm64 Worker asynchronously.
+- 23 October — Terraform now has encrypted, versioned S3 remote state; CI deploys the worker by
+  digest through GitHub OIDC. The OIDC deploy role cannot mutate IAM policies. The Worker has
+  reserved concurrency 2, event age/retry limits and 14-day logs.
+- 23 October — the quality gate is implemented in `eval/run.py`. It deliberately fails until four
+  recorded, hand-labelled live cases exist; only `todomvc-01` is currently a genuine run.
+- 23 October — the public UI has live analysis, sample-state separation, drag/drop, duration and
+  codec preflight, timeline legend and progress UI. It still needs a production redeploy after
+  `NEXT_PUBLIC_API_BASE_URL` is set and the owned TodoMVC sample before slices 8 and final review
+  can truthfully be checked off.
+
 - De-duplication now needs both the perceptual hash and a changed-pixel check on a colour thumbnail to call two frames duplicates (`spec.md > Worker pipeline`, `backend/worker/demotrace/media/dedupe.py`) — the build found that the perceptual hash gives a red and a blue screen the same hash, so a colour-only change such as a status turning green would have been thrown away as a duplicate.
 - Bedrock inference is account-blocked (`Operation not allowed` for Amazon Nova and 403 for Claude), so the temporary execution order is slice 5 before slices 2–4. This preserves the product boundary and gives a local, reviewable interface while AWS Support resolves access. The sample starts as a schema-checked local fixture and must be replaced with a recorded model result before the eval/public-submission gate.
 - A local FastAPI Control API with SQLite/private-file storage and a clearly labelled fixture worker now provides `create → upload → queue → process → poll → result` without AWS. It preserves the future Control API HTTP contract and token boundary, but is not marked as the cloud slices 6–8: the production worker, S3, DynamoDB, Lambda and model-backed result still need their planned verification.

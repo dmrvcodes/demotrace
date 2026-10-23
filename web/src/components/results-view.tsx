@@ -9,6 +9,7 @@ type ResultsViewProps = {
   onTimeUpdate: (seconds: number) => void;
   onRecheck: () => void;
   result: AnalysisResult;
+  isSample: boolean;
   videoSrc: string;
   videoRef: React.RefObject<HTMLVideoElement | null>;
 };
@@ -20,6 +21,7 @@ export function ResultsView({
   onTimeUpdate,
   onRecheck,
   result,
+  isSample,
   videoSrc,
   videoRef,
 }: ResultsViewProps) {
@@ -28,7 +30,7 @@ export function ResultsView({
       <div className="results-main">
         <div className="results-heading">
           <div>
-            <p className="eyebrow">Sample analysis</p>
+            <p className="eyebrow">{isSample ? "Example analysis" : "Live analysis"}</p>
             <h2 id="analysis-title">Evidence map</h2>
           </div>
           <span className="result-count">{result.claims.length} claims</span>
@@ -45,6 +47,7 @@ export function ResultsView({
           </video>
         </div>
         <Timeline currentTime={currentTime} onEvidenceClick={onEvidenceClick} result={result} />
+        <div className="result-legend" aria-label="Assessment legend"><span><i className="legend-dot legend-dot--shown" />Shown</span><span><i className="legend-dot legend-dot--told" />Told only</span><span><i className="legend-dot legend-dot--missing" />Missing</span></div>
         <div className="assessment-note">
           <span aria-hidden="true">i</span>
           AI assessment — click the evidence to verify.

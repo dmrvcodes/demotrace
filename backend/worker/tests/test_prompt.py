@@ -49,7 +49,7 @@ def test_no_speech_is_said_plainly():
 def test_request_settings_follow_the_spec():
     params = build_request(media_with(1), [b"x"], ["A", "B", "C"]).params
     assert params["model"] == os.environ["ANTHROPIC_MODEL"]
-    assert params["max_tokens"] == 16000
+    assert params["max_tokens"] == 4096
     assert params["output_config"] == {"effort": "high"}
     # Rejected or meaningless on current models: sampling parameters, a thinking budget, forced tools.
     assert not {"temperature", "top_p", "top_k", "thinking", "tools", "tool_choice"} & params.keys()

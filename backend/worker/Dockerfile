@@ -1,7 +1,7 @@
 # Pinned by digest (multi-arch index): CI copies its ffmpeg from the same reference.
 FROM --platform=linux/arm64 mwader/static-ffmpeg:6.1.1@sha256:a44cd22b260c527f54e99517186a209b805d0a2319e0886d356e840f62a72132 AS ffmpeg
 
-FROM public.ecr.aws/lambda/python:3.12-arm64
+FROM public.ecr.aws/lambda/python:3.12-arm64@sha256:43c5c3f9ebcfa6d849976719bfe0b8e041a5ead686a948a728262da7d868b051
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg
 COPY --from=ffmpeg /ffprobe /usr/local/bin/ffprobe
 COPY backend/shared /build/shared

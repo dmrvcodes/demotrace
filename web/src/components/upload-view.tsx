@@ -6,6 +6,7 @@ type UploadViewProps = {
 };
 
 export function UploadView({ error, fileName, onFileSelected, onTrySample }: UploadViewProps) {
+  const select = (file: File | undefined) => { if (file) void onFileSelected(file); };
   return (
     <section className="upload-view" aria-labelledby="upload-title">
       <div className="upload-view__intro">
@@ -15,11 +16,11 @@ export function UploadView({ error, fileName, onFileSelected, onTrySample }: Upl
           Map each product claim to the exact moment your demo proves it on screen.
         </p>
       </div>
-      <div className="drop-zone">
+      <div className="drop-zone" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); select(event.dataTransfer.files[0]); }}>
         <span className="drop-zone__icon" aria-hidden="true">↑</span>
         <h2>Drop an MP4 demo</h2>
         <p>Up to 3 minutes · English narration only · H.264 MP4 recommended</p>
-        <label className="secondary-button upload-button">{fileName ?? "Choose video"}<input accept="video/mp4,video/quicktime" onChange={(event) => { const [file] = Array.from(event.target.files ?? []); if (file) onFileSelected(file); }} type="file" /></label>
+        <label className="secondary-button upload-button">{fileName ?? "Choose video"}<input accept="video/mp4" onChange={(event) => select(event.target.files?.[0])} type="file" /></label>
         {fileName && <p className="upload-ready">Ready: {fileName}</p>}
         {error && <p className="error-message">{error}</p>}
       </div>

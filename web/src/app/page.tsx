@@ -21,6 +21,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [job, setJob] = useState<{ id: string; token: string; status: JobStatus } | null>(null);
   const [result, setResult] = useState(sampleAnalysis);
+  const [isSample, setIsSample] = useState(true);
 
   useEffect(() => () => { if (videoSrc.startsWith("blob:")) URL.revokeObjectURL(videoSrc); }, [videoSrc]);
   useEffect(() => {
@@ -29,8 +30,24 @@ export default function Home() {
     return () => window.clearInterval(poll);
   }, [job, screen]);
 
-  const selectFile = async (selected: File) => { setError(null); if (selected.size > 150 * 1024 * 1024) return setError("Video exceeds 150 MB."); if (selected.type && selected.type !== "video/mp4") return setError("Use an H.264 MP4 video."); const url = URL.createObjectURL(selected); setFile(selected); setVideoSrc(url); setScreen("claims"); };
-  const runLocalAnalysis = async () => { if (!file) return; setBusy(true); setError(null); try { const created = await createJob(); await uploadVideo(created, file); const queued = await startAnalysis(created.job_id, created.job_token, claims); setJob({ id: created.job_id, token: created.job_token, status: queued.status }); setScreen("waiting"); } catch (runError) { setError(runError instanceof Error ? runError.message : "Could not start analysis"); } finally { setBusy(false); } };
+  const selectFile = async (selected: File) => {
+    setError(null);
+    if (selected.size > 150 * 1024 * 1024) return setError("Video exceeds 150 MB.");
+    if (selected.type && selected.type !== "video/mp4") return setError("Use an H.264 MP4 video.");
+    const url = URL.createObjectURL(selected);
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.src = url;
+    probe.onloadedmetadata = async () => {
+      const h264 = await navigator.mediaCapabilities?.decodingInfo?.({ type: "file", video: { contentType: "video/mp4; codecs=avc1.42E01E", width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 } }).catch(() => undefined);
+      const hevc = await navigator.mediaCapabilities?.decodingInfo?.({ type: "file", video: { contentType: "video/mp4; codecs=hvc1.1.6.L93.B0", width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 } }).catch(() => undefined);
+      if (probe.duration > 180.5) { URL.revokeObjectURL(url); return setError("Video is longer than 3 minutes."); }
+      if (hevc?.supported && !h264?.supported) { URL.revokeObjectURL(url); return setError("This looks like HEVC. Re-export as H.264 MP4 before uploading."); }
+      setFile(selected); setVideoSrc(url); setIsSample(false); setScreen("claims");
+    };
+    probe.onerror = () => { URL.revokeObjectURL(url); setError("Video metadata could not be read. Re-export as H.264 MP4."); };
+  };
+  const runLiveAnalysis = async () => { if (!file) return; setBusy(true); setError(null); try { const created = await createJob(); await uploadVideo(created, file); const queued = await startAnalysis(created.job_id, created.job_token, claims); setJob({ id: created.job_id, token: created.job_token, status: queued.status }); setScreen("waiting"); } catch (runError) { setError(runError instanceof Error ? runError.message : "Could not start analysis"); } finally { setBusy(false); } };
 
   const seekToEvidence = (claimId: string, seconds: number) => {
     setActiveClaimId(claimId || null);
@@ -51,8 +68,8 @@ export default function Home() {
         <span className="environment-label">{isLive ? "LIVE ANALYSIS" : "LOCAL FIXTURE MODE"}</span>
       </header>
       <main>
-        {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc("/samples/demotrace-sample.mp4"); setScreen("results"); }} />}
-        {screen === "claims" && <ClaimsView busy={busy} claims={claims} error={error} onChange={setClaims} onStart={runLocalAnalysis} />}
+        {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc("/samples/demotrace-sample.mp4"); setIsSample(true); setScreen("results"); }} />}
+        {screen === "claims" && <ClaimsView busy={busy} claims={claims} error={error} onChange={setClaims} onStart={runLiveAnalysis} />}
         {screen === "waiting" && <WaitingView status={job?.status === "processing" ? "processing" : "queued"} />}
         {screen === "results" && (
           <ResultsView
@@ -62,6 +79,7 @@ export default function Home() {
             onTimeUpdate={setCurrentTime}
             onRecheck={() => setScreen("upload")}
             result={result}
+            isSample={isSample}
             videoRef={videoRef}
             videoSrc={videoSrc}
           />

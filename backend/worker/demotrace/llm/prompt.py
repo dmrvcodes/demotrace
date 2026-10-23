@@ -13,7 +13,9 @@ from demotrace_shared.media import Frame, PreparedMedia, SpeechSegment
 from ..timefmt import mmss
 from . import ModelError
 
-MAX_TOKENS = 16000
+# Five short claim assessments never need a 16k-token completion. Keeping this bounded protects
+# the Lambda deadline and prevents an accidental verbose response from multiplying API spend.
+MAX_TOKENS = 4096
 EFFORT = "high"  # set explicitly: the default differs between models
 
 
@@ -48,6 +50,10 @@ Rules:
 - A slide, caption, mockup or voice-over that promises or describes a feature is never "shown", \
 however convincing it looks. Only the working product producing the claimed result counts.
 - An interface that looks similar but does not display the claimed result is not "shown".
+- Hovering, focusing, opening a menu or moving a cursor is not "shown" unless the claimed result
+  itself becomes visibly true in the product interface.
+- Do not infer a result from an event that may have happened between sampled frames. If the
+  observable result is not present in a cited frame, use told_only or missing as appropriate.
 - If nothing changes on screen across the frames, say so; such claims can only be told_only or missing.
 - Cite the clearest frames, earliest first, at most 5 IDs per claim.
 - Use only the frame IDs (F...) and segment IDs (S...) given in this request.

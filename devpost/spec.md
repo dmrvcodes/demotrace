@@ -5,6 +5,15 @@ status: approved
 
 # DemoTrace — Technical Spec
 
+## As Built — 23 October
+
+The executable architecture supersedes stale planning references below: the Control service is a
+dependency-free Python 3.12 Lambda Function URL handler, not FastAPI/Mangum; inference uses the
+direct Anthropic API via a secret in AWS Secrets Manager, not Bedrock; Terraform has an encrypted
+S3 remote backend; and GitHub Actions deploys a digest-pinned arm64 Worker via a restricted OIDC
+role. `eval/run.py` is the actual quality gate and requires four genuine recorded cases before it
+can pass. The planning sections remain as historical decisions until the final documentation pass.
+
 ## How This Works, In Plain Language
 
 DemoTrace has two halves: a website the author sees, and a small cloud backend that does the heavy work.

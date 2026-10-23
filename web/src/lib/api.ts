@@ -1,4 +1,4 @@
-import type { AnalysisResult } from "./types";
+import type { AnalysisResult, Evidence } from "./types";
 
 export type JobStatus = "created" | "queued" | "processing" | "completed" | "failed";
 
@@ -7,6 +7,11 @@ export type Job = {
   status: JobStatus;
   result?: AnalysisResult;
   error_message?: string;
+};
+
+type ApiEvidence = Omit<Evidence, "refId"> & { ref_id: string };
+type ApiAnalysisResult = Omit<AnalysisResult, "claims"> & {
+  claims: Array<Omit<AnalysisResult["claims"][number], "evidence"> & { evidence: ApiEvidence[] }>;
 };
 
 type CreatedJob = { job_id: string; job_token: string; upload_url: string; upload_fields?: Record<string, string> };
@@ -58,5 +63,17 @@ export async function startAnalysis(jobId: string, token: string, claims: string
 }
 
 export async function getJob(jobId: string, token: string): Promise<Job> {
-  return apiFetch<Job>(`/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } });
+  const job = await apiFetch<Omit<Job, "result"> & { result?: ApiAnalysisResult }>(`/jobs/${jobId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return {
+    ...job,
+    result: job.result && {
+      ...job.result,
+      claims: job.result.claims.map((claim) => ({
+        ...claim,
+        evidence: claim.evidence.map(({ ref_id, ...evidence }) => ({ ...evidence, refId: ref_id })),
+      })),
+    },
+  };
 }
