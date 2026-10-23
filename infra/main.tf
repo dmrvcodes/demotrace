@@ -106,9 +106,21 @@ resource "aws_iam_role" "github_deploy" {
   assume_role_policy = local.github_assume
 }
 resource "aws_iam_role_policy" "github_deploy" {
-  name   = "demotrace-deploy-only"
-  role   = aws_iam_role.github_deploy.id
-  policy = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Action = ["s3:*", "dynamodb:*", "ecr:*", "lambda:*", "logs:*", "iam:GetRole", "iam:CreateRole", "iam:DeleteRole", "iam:PassRole", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "secretsmanager:DescribeSecret"], Resource = "*" }] })
+  name = "demotrace-deploy-only"
+  role = aws_iam_role.github_deploy.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    # AWS provider discovery calls are read-only; write actions are scoped below.
+    { Effect = "Allow", Action = ["sts:GetCallerIdentity", "ec2:DescribeAvailabilityZones", "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "lambda:GetFunction", "lambda:GetFunctionUrlConfig", "lambda:GetFunctionEventInvokeConfig", "dynamodb:DescribeTable", "ecr:DescribeRepositories", "ecr:DescribeImages", "logs:DescribeLogGroups", "secretsmanager:DescribeSecret", "s3:GetBucket*", "s3:ListBucket"], Resource = "*" },
+    { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource = "arn:aws:s3:::demotrace-623588627433-us-east-1-tfstate/production/*" },
+    { Effect = "Allow", Action = ["s3:ListBucket"], Resource = "arn:aws:s3:::demotrace-623588627433-us-east-1-tfstate" },
+    { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
+    { Effect = "Allow", Action = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart"], Resource = aws_ecr_repository.worker.arn },
+    { Effect = "Allow", Action = ["lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:PutFunctionEventInvokeConfig", "lambda:UpdateFunctionUrlConfig"], Resource = [aws_lambda_function.worker.arn, aws_lambda_function.control.arn] },
+    { Effect = "Allow", Action = ["dynamodb:UpdateTable", "dynamodb:UpdateTimeToLive"], Resource = aws_dynamodb_table.jobs.arn },
+    { Effect = "Allow", Action = ["logs:PutRetentionPolicy"], Resource = "arn:aws:logs:us-east-1:623588627433:log-group:/aws/lambda/demotrace-*" },
+    { Effect = "Allow", Action = ["iam:PassRole"], Resource = [aws_iam_role.worker.arn, aws_iam_role.control.arn], Condition = { StringEquals = { "iam:PassedToService" = "lambda.amazonaws.com" } } },
+    { Effect = "Allow", Action = ["iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy"], Resource = [aws_iam_role.worker.arn, aws_iam_role.control.arn] }
+  ] })
 }
 
 resource "aws_iam_role" "worker" {
