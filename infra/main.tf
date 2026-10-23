@@ -1,6 +1,9 @@
 terraform {
   required_version = ">= 1.6"
-  required_providers { aws = { source = "hashicorp/aws", version = "~> 6.0" } }
+  required_providers {
+    aws     = { source = "hashicorp/aws", version = "~> 6.0" }
+    archive = { source = "hashicorp/archive", version = "~> 2.7" }
+  }
 }
 
 provider "aws" { region = "us-east-1" }
@@ -35,6 +38,19 @@ resource "aws_s3_bucket_versioning" "videos" {
   bucket = aws_s3_bucket.videos.id
   versioning_configuration { status = "Enabled" }
 }
+resource "aws_s3_bucket_lifecycle_configuration" "videos" {
+  bucket = aws_s3_bucket.videos.id
+
+  rule {
+    id     = "delete-incoming-video-versions"
+    status = "Enabled"
+    filter { prefix = "incoming/" }
+
+    expiration { days = 1 }
+    noncurrent_version_expiration { noncurrent_days = 1 }
+    abort_incomplete_multipart_upload { days_after_initiation = 1 }
+  }
+}
 resource "aws_s3_bucket_server_side_encryption_configuration" "videos" {
   bucket = aws_s3_bucket.videos.id
   rule {
@@ -44,9 +60,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "videos" {
 resource "aws_s3_bucket_cors_configuration" "videos" {
   bucket = aws_s3_bucket.videos.id
   cors_rule {
-    allowed_methods = ["PUT"]
+    allowed_methods = ["POST", "PUT"]
     allowed_origins = ["http://localhost:3000", "https://*.vercel.app"]
-    allowed_headers = ["content-type"]
+    allowed_headers = ["content-type", "x-amz-*"]
   }
 }
 resource "aws_dynamodb_table" "jobs" {
@@ -101,9 +117,78 @@ resource "aws_iam_role_policy" "worker" {
   role = aws_iam_role.worker.id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
     { Effect = "Allow", Action = ["s3:GetObjectVersion", "s3:DeleteObjectVersion"], Resource = "${aws_s3_bucket.videos.arn}/incoming/*" },
+    { Effect = "Allow", Action = ["s3:ListBucketVersions"], Resource = aws_s3_bucket.videos.arn, Condition = { StringLike = { "s3:prefix" = ["incoming/*"] } } },
     { Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:UpdateItem"], Resource = aws_dynamodb_table.jobs.arn },
     { Effect = "Allow", Action = ["secretsmanager:GetSecretValue"], Resource = aws_secretsmanager_secret.anthropic.arn }
   ] })
+}
+
+resource "aws_iam_role" "control" {
+  name               = "demotrace-control"
+  assume_role_policy = local.lambda_assume
+}
+resource "aws_iam_role_policy_attachment" "control_logs" {
+  role       = aws_iam_role.control.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+resource "aws_iam_role_policy" "control" {
+  name = "job-control-plane"
+  role = aws_iam_role.control.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [
+    { Effect = "Allow", Action = ["s3:PutObject", "s3:GetObject"], Resource = "${aws_s3_bucket.videos.arn}/incoming/*" },
+    { Effect = "Allow", Action = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"], Resource = aws_dynamodb_table.jobs.arn },
+    { Effect = "Allow", Action = ["lambda:InvokeFunction"], Resource = aws_lambda_function.worker.arn }
+  ] })
+}
+
+data "archive_file" "control" {
+  type        = "zip"
+  source_file = "${path.module}/../backend/control/lambda/handler.py"
+  output_path = "${path.module}/.terraform/control-lambda.zip"
+}
+
+resource "aws_lambda_function" "control" {
+  function_name    = "demotrace-control"
+  role             = aws_iam_role.control.arn
+  runtime          = "python3.12"
+  handler          = "handler.handler"
+  architectures    = ["arm64"]
+  filename         = data.archive_file.control.output_path
+  source_code_hash = data.archive_file.control.output_base64sha256
+  timeout          = 15
+  memory_size      = 512
+  environment { variables = {
+    JOBS_TABLE_NAME      = aws_dynamodb_table.jobs.name
+    VIDEOS_BUCKET_NAME   = aws_s3_bucket.videos.id
+    WORKER_FUNCTION_NAME = aws_lambda_function.worker.function_name
+    MAX_DAILY_ANALYSES   = "30"
+  } }
+  depends_on = [aws_cloudwatch_log_group.control]
+}
+
+resource "aws_cloudwatch_log_group" "control" {
+  name              = "/aws/lambda/demotrace-control"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function_url" "control" {
+  function_name      = aws_lambda_function.control.function_name
+  authorization_type = "NONE"
+  cors {
+    allow_credentials = false
+    allow_headers     = ["authorization", "content-type"]
+    allow_methods     = ["GET", "POST"]
+    allow_origins     = ["http://localhost:3000", "https://*.vercel.app"]
+    max_age           = 600
+  }
+}
+
+resource "aws_lambda_permission" "control_public_url" {
+  statement_id           = "FunctionUrlPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.control.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
 }
 resource "aws_lambda_function" "worker" {
   function_name = "demotrace-worker"
@@ -117,9 +202,21 @@ resource "aws_lambda_function" "worker" {
   environment { variables = { JOBS_TABLE_NAME = aws_dynamodb_table.jobs.name, VIDEOS_BUCKET_NAME = aws_s3_bucket.videos.id, ANTHROPIC_SECRET_ARN = aws_secretsmanager_secret.anthropic.arn, ANTHROPIC_MODEL = var.anthropic_model } }
 }
 
+resource "aws_cloudwatch_log_group" "worker" {
+  name              = "/aws/lambda/${aws_lambda_function.worker.function_name}"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function_event_invoke_config" "worker" {
+  function_name                = aws_lambda_function.worker.function_name
+  maximum_event_age_in_seconds = 900
+  maximum_retry_attempts       = 0
+}
+
 output "github_deploy_role_arn" { value = aws_iam_role.github_deploy.arn }
 
 output "videos_bucket" { value = aws_s3_bucket.videos.id }
 output "jobs_table" { value = aws_dynamodb_table.jobs.name }
 output "anthropic_secret_arn" { value = aws_secretsmanager_secret.anthropic.arn }
 output "ecr_repository_url" { value = aws_ecr_repository.worker.repository_url }
+output "control_api_url" { value = aws_lambda_function_url.control.function_url }

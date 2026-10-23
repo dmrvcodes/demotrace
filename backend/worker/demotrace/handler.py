@@ -68,21 +68,40 @@ def _log(**fields) -> None:
     print(json.dumps({"event": "demotrace_job", **fields}, separators=(",", ":"), default=str))
 
 
+def _delete_all_versions(s3, bucket: str, key: str) -> None:
+    """Remove every version and delete marker for one job-owned object.
+
+    The Worker always consumes a pinned version, but a stale/retried browser PUT
+    can leave another version behind. Deleting by key/version rather than only
+    the consumed version keeps the privacy promise independent of that race.
+    """
+    paginator = s3.get_paginator("list_object_versions")
+    for page in paginator.paginate(Bucket=bucket, Prefix=key):
+        objects = [
+            {"Key": entry["Key"], "VersionId": entry["VersionId"]}
+            for entry in [*page.get("Versions", []), *page.get("DeleteMarkers", [])]
+            if entry["Key"] == key
+        ]
+        if objects:
+            s3.delete_objects(Bucket=bucket, Delete={"Objects": objects, "Quiet": True})
+
+
 def handler(event, context):
-    job_id, key, version, claims = event["job_id"], event["key"], event["version_id"], event["claims"]
+    job_id = event["job_id"]
     table, s3, secrets = _clients()
     pk = {"pk": f"JOB#{job_id}"}
     run_id = str(uuid.uuid4())
     names = {"#s": "status"}
 
     try:
-        table.update_item(
+        claimed = table.update_item(
             Key=pk,
             UpdateExpression="SET #s=:processing, run_id=:run, started_at=:now",
             ConditionExpression="#s=:queued",
             ExpressionAttributeNames=names,
             ExpressionAttributeValues={":processing": "processing", ":queued": "queued", ":run": run_id,
                                        ":now": int(time.time())},
+            ReturnValues="ALL_NEW",
         )
     except ClientError as error:
         if _conditional_failed(error):
@@ -90,6 +109,9 @@ def handler(event, context):
             return {"outcome": "duplicate"}
         _log(job_id=job_id, outcome="claim_error", error_type=type(error).__name__)
         raise
+
+    item = claimed["Attributes"]
+    key, version, claims = item["key"], item["version_id"], item["claims"]
 
     tracker = StageTracker()
     info: dict = {}
@@ -154,6 +176,6 @@ def handler(event, context):
         return {"outcome": "failed", "code": str(code), "stage": stage}
     finally:
         try:
-            s3.delete_object(Bucket=os.environ["VIDEOS_BUCKET_NAME"], Key=key, VersionId=version)
+            _delete_all_versions(s3, os.environ["VIDEOS_BUCKET_NAME"], key)
         except Exception as error:  # the S3 lifecycle rule is the backstop
             _log(job_id=job_id, outcome="cleanup_error", error_type=type(error).__name__)

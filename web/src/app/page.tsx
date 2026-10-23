@@ -28,8 +28,8 @@ export default function Home() {
     return () => window.clearInterval(poll);
   }, [job, screen]);
 
-  const selectFile = async (selected: File) => { setError(null); if (selected.size > 150 * 1024 * 1024) return setError("Video exceeds 150 MB."); const url = URL.createObjectURL(selected); setFile(selected); setVideoSrc(url); setScreen("claims"); };
-  const runLocalAnalysis = async () => { if (!file) return; setBusy(true); setError(null); try { const created = await createJob(); await uploadVideo(created.upload_url, created.job_token, file); const queued = await startAnalysis(created.job_id, created.job_token, claims); setJob({ id: created.job_id, token: created.job_token, status: queued.status }); setScreen("waiting"); } catch (runError) { setError(runError instanceof Error ? runError.message : "Could not start analysis"); } finally { setBusy(false); } };
+  const selectFile = async (selected: File) => { setError(null); if (selected.size > 150 * 1024 * 1024) return setError("Video exceeds 150 MB."); if (selected.type && selected.type !== "video/mp4") return setError("Use an H.264 MP4 video."); const url = URL.createObjectURL(selected); setFile(selected); setVideoSrc(url); setScreen("claims"); };
+  const runLocalAnalysis = async () => { if (!file) return; setBusy(true); setError(null); try { const created = await createJob(); await uploadVideo(created, file); const queued = await startAnalysis(created.job_id, created.job_token, claims); setJob({ id: created.job_id, token: created.job_token, status: queued.status }); setScreen("waiting"); } catch (runError) { setError(runError instanceof Error ? runError.message : "Could not start analysis"); } finally { setBusy(false); } };
 
   const seekToEvidence = (claimId: string, seconds: number) => {
     setActiveClaimId(claimId || null);

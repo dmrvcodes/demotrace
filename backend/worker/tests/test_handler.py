@@ -32,7 +32,7 @@ def conditional_failed():
 
 class FakeTable:
     def __init__(self, status="queued"):
-        self.item = {"status": status}
+        self.item = {"status": status, "key": "incoming/job-1", "version_id": "v1", "claims": CLAIMS}
         self.updates = []
         self.fail_completion_with = None
 
@@ -55,6 +55,7 @@ class FakeTable:
         for field in ("error_code", "failed_stage"):
             if f"{field}=:" in kw["UpdateExpression"]:
                 self.item[field] = values[":code" if field == "error_code" else ":stage"]
+        return {"Attributes": dict(self.item)}
 
 
 class FakeS3:
@@ -68,7 +69,15 @@ class FakeS3:
             raise self.download_error
         open(path, "wb").write(b"video")
 
-    def delete_object(self, **kw):
+    def get_paginator(self, operation):
+        assert operation == "list_object_versions"
+        return self
+
+    def paginate(self, **kw):
+        assert kw == {"Bucket": "bucket", "Prefix": "incoming/job-1"}
+        return [{"Versions": [{"Key": "incoming/job-1", "VersionId": "v1"}], "DeleteMarkers": []}]
+
+    def delete_objects(self, **kw):
         self.deleted.append(kw)
 
 
@@ -123,7 +132,7 @@ def test_completed_job_saves_result_timings_and_one_log_line(env, monkeypatch, c
     assert saved[":result"]["claims"][0]["status"] == "shown"
     assert set(saved[":timings"]) >= {"download", "prepare", "transcribe", "secret", "model", "validate"}
     assert saved[":conf"] == {"C1": "high", "C2": "medium", "C3": "high"}
-    assert s3.deleted == [{"Bucket": "bucket", "Key": "incoming/job-1", "VersionId": "v1"}]
+    assert s3.deleted == [{"Bucket": "bucket", "Delete": {"Objects": [{"Key": "incoming/job-1", "VersionId": "v1"}], "Quiet": True}}]
     [log] = logs
     assert log["outcome"] == "completed" and log["input_tokens"] == 1000 and log["model"] == "test-model"
 
@@ -159,6 +168,18 @@ def test_duplicate_delivery_leaves_the_job_alone(env, monkeypatch, capsys):
     assert out == {"outcome": "duplicate"} and len(table.updates) == 1
     assert not s3.deleted  # the first delivery owns the video
     assert logs == [{"event": "demotrace_job", "job_id": "job-1", "outcome": "duplicate"}]
+
+
+def test_worker_event_only_needs_the_job_id(env, monkeypatch, capsys):
+    table = FakeTable()
+    s3 = FakeS3()
+    monkeypatch.setattr(worker, "_clients", lambda: (table, s3, FakeSecrets()))
+    monkeypatch.setattr(worker, "prepare", lambda *args, **kwargs: MEDIA)
+    monkeypatch.setattr(worker, "load_frames", lambda *args: [b"x"])
+    monkeypatch.setattr(worker, "build_request", lambda *args: ModelRequest({"model": "test-model"}, 1))
+    monkeypatch.setattr(worker, "make_client", lambda: object())
+    monkeypatch.setattr(worker, "call_model", lambda *args, **kwargs: ModelResult(GOOD, {}, "end_turn", "req", 0.1))
+    assert worker.handler({"job_id": "job-1"}, CONTEXT) == {"outcome": "completed"}
 
 
 def test_other_claim_errors_are_raised_not_hidden(env, monkeypatch, capsys):
