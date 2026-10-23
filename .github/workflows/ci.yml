@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
+      - uses: FedericoCarboni/setup-ffmpeg@v3
       - run: pip install -e backend/shared -e 'backend/worker[dev]' -e 'backend/control[dev]'
       - run: PYTHONPATH=backend/worker:backend/shared:backend/control pytest -q backend/worker/tests backend/control/tests
       - uses: actions/setup-node@v4
