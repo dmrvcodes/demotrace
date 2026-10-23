@@ -93,7 +93,7 @@ resource "aws_secretsmanager_secret" "anthropic" {
 
 locals {
   lambda_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "lambda.amazonaws.com" }, Action = "sts:AssumeRole" }] })
-  github_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Federated = aws_iam_openid_connect_provider.github.arn }, Action = "sts:AssumeRoleWithWebIdentity", Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = "repo:dmrvcodes/demotrace:ref:refs/heads/main" } } }] })
+  github_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Federated = aws_iam_openid_connect_provider.github.arn }, Action = "sts:AssumeRoleWithWebIdentity", Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = ["repo:dmrvcodes/demotrace:ref:refs/heads/main", "repo:dmrvcodes/demotrace:environment:production"] } } }] })
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
