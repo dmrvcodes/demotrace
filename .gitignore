@@ -31,3 +31,4 @@ __pycache__/
 # Local pipeline output (frames and transcripts derived from videos)
 out/
 work/
+.vercel/
