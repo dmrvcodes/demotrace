@@ -6,6 +6,7 @@ import os
 import secrets
 import time
 import uuid
+from decimal import Decimal
 
 import boto3
 from botocore.exceptions import ClientError
@@ -21,7 +22,12 @@ def _daily_limit() -> int:
 
 
 def _json(status: int, body: dict) -> dict:
-    return {"statusCode": status, "headers": {"content-type": "application/json", "cache-control": "no-store"}, "body": json.dumps(body)}
+    def encode(value):
+        if isinstance(value, Decimal):
+            return int(value) if value == value.to_integral_value() else float(value)
+        raise TypeError(f"cannot serialize {type(value)!r}")
+
+    return {"statusCode": status, "headers": {"content-type": "application/json", "cache-control": "no-store"}, "body": json.dumps(body, default=encode)}
 
 
 def _token(event: dict) -> str | None:
@@ -104,8 +110,9 @@ def _consume_daily_capacity(table, now: int) -> bool:
     try:
         table.update_item(
             Key={"pk": f"LIMIT#{day}"},
-            UpdateExpression="ADD analyses :one SET ttl=:ttl",
+            UpdateExpression="ADD analyses :one SET #ttl=:ttl",
             ConditionExpression="attribute_not_exists(analyses) OR analyses < :limit",
+            ExpressionAttributeNames={"#ttl": "ttl"},
             ExpressionAttributeValues={":one": 1, ":limit": _daily_limit(), ":ttl": now + TTL_SECONDS},
         )
         return True

@@ -144,7 +144,9 @@ resource "aws_iam_role_policy" "control" {
 data "archive_file" "control" {
   type        = "zip"
   source_file = "${path.module}/../backend/control/lambda/handler.py"
-  output_path = "${path.module}/.terraform/control-lambda.zip"
+  # A content-addressed path prevents a stale local zip from being re-used by
+  # a later Terraform plan after the source handler has changed.
+  output_path = "${path.module}/.terraform/control-lambda-${filesha256("${path.module}/../backend/control/lambda/handler.py")}.zip"
 }
 
 resource "aws_lambda_function" "control" {
@@ -178,8 +180,10 @@ resource "aws_lambda_function_url" "control" {
     allow_credentials = false
     allow_headers     = ["authorization", "content-type"]
     allow_methods     = ["GET", "POST"]
-    allow_origins     = ["http://localhost:3000", "https://*.vercel.app"]
-    max_age           = 600
+    # Lambda URLs accept protocol-level wildcards, not subdomain wildcards.
+    # Job tokens protect individual reports; this permits the Vercel preview/production origins.
+    allow_origins = ["http://localhost:3000", "https://*"]
+    max_age       = 600
   }
 }
 

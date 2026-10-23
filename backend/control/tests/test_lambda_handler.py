@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from decimal import Decimal
 
 from botocore.exceptions import ClientError
 
@@ -156,3 +157,8 @@ def test_daily_capacity_stops_before_queueing(monkeypatch):
     assert response["statusCode"] == 429
     assert table.items[f"JOB#{second['job_id']}"]["status"] == "created"
     assert len(worker.events) == 1
+
+
+def test_job_json_serializes_dynamodb_decimals():
+    response = handler._json(200, {"result": {"duration_s": Decimal("12.5"), "count": Decimal("2")}})
+    assert json.loads(response["body"]) == {"result": {"duration_s": 12.5, "count": 2}}
