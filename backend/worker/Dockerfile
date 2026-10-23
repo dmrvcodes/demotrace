@@ -1,4 +1,5 @@
-FROM --platform=linux/arm64 mwader/static-ffmpeg:6.1.1 AS ffmpeg
+# Pinned by digest (multi-arch index): CI copies its ffmpeg from the same reference.
+FROM --platform=linux/arm64 mwader/static-ffmpeg:6.1.1@sha256:a44cd22b260c527f54e99517186a209b805d0a2319e0886d356e840f62a72132 AS ffmpeg
 
 FROM public.ecr.aws/lambda/python:3.12-arm64
 COPY --from=ffmpeg /ffmpeg /usr/local/bin/ffmpeg

@@ -16,7 +16,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - uses: FedericoCarboni/setup-ffmpeg@v3
+      # The same ffmpeg build as the worker image, so CI and Lambda can never drift apart.
+      - name: Install the ffmpeg build the worker image uses
+        run: |
+          docker create --name ffmpeg-src mwader/static-ffmpeg:6.1.1@sha256:a44cd22b260c527f54e99517186a209b805d0a2319e0886d356e840f62a72132
+          mkdir -p "$RUNNER_TEMP/ffmpeg"
+          docker cp ffmpeg-src:/ffmpeg "$RUNNER_TEMP/ffmpeg/ffmpeg"
+          docker cp ffmpeg-src:/ffprobe "$RUNNER_TEMP/ffmpeg/ffprobe"
+          docker rm ffmpeg-src
+          echo "$RUNNER_TEMP/ffmpeg" >> "$GITHUB_PATH"
+      - run: ffmpeg -version | head -1 && ffprobe -version | head -1
       - run: pip install -e backend/shared -e 'backend/worker[dev]' -e 'backend/control[dev]'
       - run: PYTHONPATH=backend/worker:backend/shared:backend/control pytest -q backend/worker/tests backend/control/tests
       - uses: actions/setup-node@v4
@@ -29,8 +38,13 @@ jobs:
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
-    runs-on: ubuntu-latest
+    # Native arm64 runner (free for public repositories): the image's RUN steps execute without QEMU.
+    runs-on: ubuntu-24.04-arm
     environment: production
+    # Two applies must never overlap; a queued deploy waits instead of cancelling a running one.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
@@ -38,6 +52,13 @@ jobs:
           role-to-assume: arn:aws:iam::623588627433:role/demotrace-github-deploy
           role-session-name: demotrace-github-deploy
           aws-region: us-east-1
+      - name: AWS CLI on the arm runner
+        run: |
+          if ! command -v aws >/dev/null; then
+            curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "$RUNNER_TEMP/awscli.zip"
+            unzip -q "$RUNNER_TEMP/awscli.zip" -d "$RUNNER_TEMP" && sudo "$RUNNER_TEMP/aws/install"
+          fi
+          aws --version
       - uses: docker/setup-buildx-action@v3
       - run: |
           REPOSITORY=623588627433.dkr.ecr.us-east-1.amazonaws.com/demotrace-worker
@@ -47,6 +68,29 @@ jobs:
           DIGEST="$(aws ecr describe-images --repository-name demotrace-worker --image-ids imageTag="${GITHUB_SHA}" --query 'imageDetails[0].imageDigest' --output text)"
           echo "WORKER_IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
       - uses: hashicorp/setup-terraform@v3
+        with: { terraform_wrapper: false }
       - run: terraform -chdir=infra init -input=false
-      - run: terraform -chdir=infra plan -input=false -var "worker_image_digest=${WORKER_IMAGE_DIGEST}" -out=deploy.tfplan
+      - run: terraform -chdir=infra plan -input=false -no-color -var "worker_image_digest=${WORKER_IMAGE_DIGEST}" -out=deploy.tfplan
+      # Read the plan before applying it: any delete or replace stops the deploy for a human decision.
+      - name: Refuse plans that delete or replace resources
+        run: |
+          terraform -chdir=infra show -json deploy.tfplan > "$RUNNER_TEMP/plan.json"
+          jq -r '.resource_changes[] | select(.change.actions | index("delete")) | "\(.address) \(.change.actions | join("+"))"' \
+            "$RUNNER_TEMP/plan.json" > "$RUNNER_TEMP/deletes.txt"
+          jq -r '.resource_changes[] | select(.change.actions != ["no-op"]) | "\(.change.actions | join("+")) \(.address)"' "$RUNNER_TEMP/plan.json"
+          if [ -s "$RUNNER_TEMP/deletes.txt" ]; then
+            echo "::error::The plan deletes or replaces resources; not applying:"
+            cat "$RUNNER_TEMP/deletes.txt"
+            exit 1
+          fi
       - run: terraform -chdir=infra apply -input=false deploy.tfplan
+      - name: Check the live system after deploy
+        run: |
+          aws lambda wait function-updated-v2 --function-name demotrace-worker
+          deployed="$(aws lambda get-function --function-name demotrace-worker --query 'Code.ResolvedImageUri' --output text)"
+          echo "worker image: $deployed"
+          case "$deployed" in *"@${WORKER_IMAGE_DIGEST}") ;; *) echo "::error::worker is not on ${WORKER_IMAGE_DIGEST}"; exit 1 ;; esac
+          url="$(terraform -chdir=infra output -raw control_api_url)"
+          code="$(curl -s -o /dev/null -w '%{http_code}' "${url%/}/jobs/00000000-0000-0000-0000-000000000000")"
+          echo "control API answered $code for an unknown job without a token"
+          case "$code" in 401|403|404) ;; *) echo "::error::unexpected control API answer $code"; exit 1 ;; esac
