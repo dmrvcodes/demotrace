@@ -93,7 +93,14 @@ resource "aws_secretsmanager_secret" "anthropic" {
 
 locals {
   lambda_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Service = "lambda.amazonaws.com" }, Action = "sts:AssumeRole" }] })
-  github_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Federated = aws_iam_openid_connect_provider.github.arn }, Action = "sts:AssumeRoleWithWebIdentity", Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = ["repo:dmrvcodes/demotrace:ref:refs/heads/main", "repo:dmrvcodes/demotrace:environment:production"] } } }] })
+  # This repository uses GitHub's immutable subject claims (owner and repo IDs in the sub), so the
+  # name-only form never matches; it is kept in case the setting is switched back. Only the
+  # production environment may deploy, never a bare push to a branch.
+  github_deploy_subjects = [
+    "repo:dmrvcodes@85731803/demotrace@1427533148:environment:production",
+    "repo:dmrvcodes/demotrace:environment:production",
+  ]
+  github_assume = jsonencode({ Version = "2012-10-17", Statement = [{ Effect = "Allow", Principal = { Federated = aws_iam_openid_connect_provider.github.arn }, Action = "sts:AssumeRoleWithWebIdentity", Condition = { StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }, StringLike = { "token.actions.githubusercontent.com:sub" = local.github_deploy_subjects } } }] })
 }
 
 resource "aws_iam_openid_connect_provider" "github" {
