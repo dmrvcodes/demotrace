@@ -215,9 +215,9 @@ resource "aws_lambda_function_url" "control" {
     allow_credentials = false
     allow_headers     = ["authorization", "content-type"]
     allow_methods     = ["GET", "POST"]
-    # Lambda URLs accept protocol-level wildcards, not subdomain wildcards.
-    # Job tokens protect individual reports; this permits the Vercel preview/production origins.
-    allow_origins = ["http://localhost:3000", "https://*"]
+    # Function URLs do not support a safe subdomain wildcard. Production is intentionally exact;
+    # previews are not part of the public upload surface.
+    allow_origins = ["http://localhost:3000", "https://demotrace.vercel.app"]
     max_age       = 600
   }
 }
