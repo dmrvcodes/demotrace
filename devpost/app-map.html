@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DemoTrace App Map</title>
+<style>
+  :root { --bg:#ffffff; --surface:#f4f4f5; --text:#18181b; --muted:#52525b; --border:#d4d4d8;
+          --shown:#047857; --told:#b45309; --missing:#52525b; --accent:#047857; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#09090b; --surface:#18181b; --text:#f4f4f5; --muted:#a1a1aa; --border:#27272a;
+            --shown:#10b981; --told:#f59e0b; --missing:#a1a1aa; --accent:#10b981; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 30px; letter-spacing: -.02em; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 36px 0 10px; }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .9em; }
+  code { background: var(--surface); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 12px 0; }
+  .stop { display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+  .stop b.n { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); font-family: ui-monospace, Menlo, monospace; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 14px; }
+  details { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin: 10px 0; background: var(--surface); }
+  summary { cursor: pointer; font-weight: 600; }
+  summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: ui-monospace, Menlo, monospace; fill: var(--text); }
+  svg .box { fill: var(--surface); stroke: var(--border); stroke-width: 1.5; }
+  svg .kernel { stroke: var(--accent); stroke-width: 2; }
+  svg .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#head); }
+  svg .label { fill: var(--muted); font-size: 11px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>DemoTrace — app map</h1>
+  <p class="muted">A take-home guide to the code. Snapshot of commit <code>9682ee5</code> (24 October 2026); the code can drift after this, so trust the source over this page.</p>
+
+  <h2>What it is, in one paragraph</h2>
+  <p>You upload a demo video (up to 3 minutes) and 3–5 claims. A Worker on AWS Lambda takes frames and a transcript, asks Claude one structured question per claim — <strong>Shown</strong>, <strong>Told only</strong> or <strong>Missing</strong>, and which frames or speech segments prove it — then checks that every cited piece of evidence really exists and computes the timestamps itself. The browser shows the video next to one card per claim; a click on a timestamp jumps to that second. The video is deleted from S3 right after download.</p>
+
+  <h2>One action through the code: "analyze my video"</h2>
+  <svg viewBox="0 0 880 250" role="img" aria-labelledby="flow-title flow-desc">
+    <title id="flow-title">Path of one analysis</title>
+    <desc id="flow-desc">The browser creates a job and uploads to S3, the Control API queues it, the Worker prepares media, calls Claude, validates and saves, and the browser shows the evidence map.</desc>
+    <defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+    <rect class="box" x="10" y="20" width="190" height="72" rx="10"/>
+    <text x="24" y="46" font-size="13">Browser</text>
+    <text x="24" y="66" class="label">page.tsx · runLiveAnalysis</text>
+    <text x="24" y="82" class="label">upload → analyze → poll</text>
+
+    <rect class="box" x="250" y="20" width="190" height="72" rx="10"/>
+    <text x="264" y="46" font-size="13">Control API</text>
+    <text x="264" y="66" class="label">control/lambda/handler.py</text>
+    <text x="264" y="82" class="label">_queue_with_capacity</text>
+
+    <rect class="box kernel" x="480" y="20" width="236" height="72" rx="10"/>
+    <text x="494" y="46" font-size="13">Worker (Lambda)</text>
+    <text x="494" y="66" class="label">worker/demotrace/handler.py</text>
+    <text x="494" y="82" class="label">download·prepare·model·validate</text>
+
+    <rect class="box" x="752" y="20" width="118" height="72" rx="10"/>
+    <text x="764" y="46" font-size="13">Claude</text>
+    <text x="764" y="66" class="label">llm/client.py</text>
+    <text x="764" y="82" class="label">call_model</text>
+
+    <rect class="box kernel" x="480" y="150" width="236" height="72" rx="10"/>
+    <text x="494" y="176" font-size="13">Validation</text>
+    <text x="494" y="196" class="label">validate.py · assemble_result</text>
+    <text x="494" y="212" class="label">ids exist · times from frames</text>
+
+    <rect class="box" x="10" y="150" width="190" height="72" rx="10"/>
+    <text x="24" y="176" font-size="13">Evidence map</text>
+    <text x="24" y="196" class="label">results-view · timeline</text>
+    <text x="24" y="212" class="label">click a time → video seeks</text>
+
+    <rect class="box" x="250" y="150" width="190" height="72" rx="10"/>
+    <text x="264" y="176" font-size="13">DynamoDB job row</text>
+    <text x="264" y="196" class="label">status · result · timings</text>
+    <text x="264" y="212" class="label">GET /jobs/{id} with token</text>
+
+    <path class="arrow" d="M200,56 L246,56" style="color:var(--muted)"/>
+    <path class="arrow" d="M440,56 L476,56" style="color:var(--muted)"/>
+    <path class="arrow" d="M716,50 L748,50" style="color:var(--muted)"/>
+    <path class="arrow" d="M748,66 L718,66" style="color:var(--muted)"/>
+    <path class="arrow" d="M598,92 L598,146" style="color:var(--muted)"/>
+    <path class="arrow" d="M480,186 L444,186" style="color:var(--muted)"/>
+    <path class="arrow" d="M250,186 L204,186" style="color:var(--muted)"/>
+  </svg>
+  <p class="muted">Outlined in green: the two places that carry the product's core idea — telling "said" apart from "shown".</p>
+
+  <h2>A three-stop route <span class="muted" style="font-size:14px;font-weight:400">(reference route)</span></h2>
+  <div class="card stop"><b class="n">1</b><div>
+    <p><code>web/src/app/page.tsx</code> — search <code>runLiveAnalysis</code>.</p>
+    <p>The whole browser side of an analysis in one function: create the job, upload the file with the presigned POST, start the analysis with the claims, then poll until it is completed or failed. The video you play is your local file, never one downloaded back.</p>
+  </div></div>
+  <div class="card stop"><b class="n">2</b><div>
+    <p><code>backend/worker/demotrace/handler.py</code> — search <code>def handler</code> and <code>tracker.stage(</code>.</p>
+    <p>The Worker claims the job only if it is still queued, then runs named stages. A failure is recorded with its stage and a specific code, so a failed job says what actually broke. The video is deleted from S3 right after the download.</p>
+  </div></div>
+  <div class="card stop"><b class="n">3</b><div>
+    <p><code>backend/worker/demotrace/validate.py</code> — search <code>assemble_result</code>.</p>
+    <p>Where the model's answer is checked against this job's own frames and speech: unknown IDs, a Shown claim without a frame, Missing with evidence — all rejected. Timestamps come from our frames, not from the model. The rule that a promise slide is never Shown lives in the prompt (<code>SYSTEM_PROMPT</code> in <code>llm/prompt.py</code>) and is measured by the eval.</p>
+  </div></div>
+
+  <h2>To change this, start here</h2>
+  <table>
+    <tr><th>You want to change…</th><th>Start at</th></tr>
+    <tr><td>How Claude judges Shown / Told only / Missing</td><td><code>backend/worker/demotrace/llm/prompt.py</code> · <code>SYSTEM_PROMPT</code> — then rerun the eval</td></tr>
+    <tr><td>Which answers are accepted</td><td><code>backend/worker/demotrace/validate.py</code> · <code>assemble_result</code></td></tr>
+    <tr><td>The model</td><td><code>infra/main.tf</code> · <code>variable "anthropic_model"</code> (the only place it is set)</td></tr>
+    <tr><td>How many frames are kept, and what counts as a duplicate</td><td><code>media/frames.py</code> · <code>frame_filter</code>; <code>media/dedupe.py</code> · <code>NEAR_DUPLICATE_CHANGE</code></td></tr>
+    <tr><td>The daily analysis limit</td><td><code>infra/main.tf</code> · <code>MAX_DAILY_ANALYSES</code> (0 switches analysis off)</td></tr>
+    <tr><td>Colors and type</td><td><code>web/src/app/globals.css</code> · <code>--shown</code>, <code>--told-only</code>, <code>--missing</code></td></tr>
+    <tr><td>The "Try with sample" example</td><td><code>web/src/lib/sample.ts</code> and <code>web/public/samples/</code></td></tr>
+  </table>
+
+  <h2>A practice to reuse</h2>
+  <div class="card">
+    <p><strong>Write the observable result down first, then score the system against it.</strong> The PRD said a slide that promises a feature is never Shown. That became a hand-labelled case with two negative claims — <code>eval/cases/todomvc-01.json</code> (a hovered button that is never clicked, and a "coming soon" slide) — and a scorer, <code>eval/score.py</code>, that reports false Shown on negatives separately. The first live run scored 5/5 statuses, 4/4 evidence in range and 0/2 false Shown; <code>eval/run.py</code> refuses to claim a quality gate from fewer than four such cases.</p>
+    <p class="muted">On another project: turn the one rule your product must never break into a labelled example with a negative case, before you tune anything, so "it looks right" becomes a number you can rerun.</p>
+  </div>
+
+  <h2>Run it again</h2>
+  <details open><summary>Try the live app</summary>
+    <p>Open <a href="https://demotrace.vercel.app">demotrace.vercel.app</a>, click <strong>Try with sample</strong>, click a timestamp. For a live analysis, drop your own MP4 (up to 3 minutes, English narration) and enter 3–5 claims.</p>
+  </details>
+  <details><summary>Interface locally, no cloud</summary>
+    <p><code>cd web &amp;&amp; npm ci &amp;&amp; npm run dev</code>, then open <code>http://localhost:3000</code> and use the sample.</p>
+  </details>
+  <details><summary>Pipeline and tests locally</summary>
+    <p><code>.venv/bin/python -m demotrace.cli prepare VIDEO --out out/x</code> — frames and transcript only, no model call.</p>
+    <p><code>PYTHONPATH=backend/worker:backend/shared:backend/control .venv/bin/pytest -q backend/worker/tests backend/control/tests eval/tests</code></p>
+    <p><code>.venv/bin/python eval/run.py</code> — the quality gate over recorded runs.</p>
+  </details>
+</main>
+</body>
+</html>

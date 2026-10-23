@@ -5,14 +5,18 @@ status: approved
 
 # DemoTrace — Technical Spec
 
-## As Built — 23 October
+## As Built (24 October, feature freeze)
 
-The executable architecture supersedes stale planning references below: the Control service is a
-dependency-free Python 3.12 Lambda Function URL handler, not FastAPI/Mangum; inference uses the
-direct Anthropic API via a secret in AWS Secrets Manager, not Bedrock; Terraform has an encrypted
-S3 remote backend; and GitHub Actions deploys a digest-pinned arm64 Worker via a restricted OIDC
-role. `eval/run.py` is the actual quality gate and requires four genuine recorded cases before it
-can pass. The planning sections remain as historical decisions until the final documentation pass.
+This section describes what is actually deployed and supersedes the planning sections below where they differ; those stay as the record of the original decisions. Each difference has its reason in `checklist.md > Revisions`.
+
+- **Interface** — Next.js on Vercel ([demotrace.vercel.app](https://demotrace.vercel.app)): Upload → Claims → Waiting → Results, drag and drop, a browser preflight (longer than 180.5 s is refused; HEVC without H.264 support is refused with a re-export hint), the timeline with colored markers and click-to-seek, and **Re-check with new video**, which keeps the claims. **Try with sample** plays a scripted TodoMVC demo with a recorded result from the deployed Worker, labelled as a recorded analysis. *Not built:* the saved report and resume after closing the tab (`prd.md > Returning to a result`); state lives only while the page is open.
+- **Control API** — a dependency-free Python 3.12 handler on a Lambda Function URL, not FastAPI/Mangum; CORS is configured on the URL only. `POST /jobs` returns a job id, a 32-byte token (only its SHA-256 is stored) and a presigned **POST** for `incoming/{job_id}` (`video/mp4`, 1 byte–150 MB, 10 minutes). `POST /jobs/{id}/analyze` checks the upload, then one DynamoDB transaction reserves daily capacity (`MAX_DAILY_ANALYSES`, default 30) and moves `CREATED → QUEUED`, then invokes the Worker with `{job_id}` only; a failed invoke fails the job. `GET /jobs/{id}` fails a job that passed its deadline (`analysis_expired`). Job records expire after 7 days.
+- **Worker** — container image on arm64, 3008 MB, 2 GB `/tmp`, reserved concurrency 2, no retries, event age 900 s, 14-day logs, deployed **by digest**. ffmpeg 6.1.1 (`mwader/static-ffmpeg`, pinned by digest; CI tests with the same build) and whisper `small.en` are baked in. Stages: claim (`QUEUED → PROCESSING` with a `run_id`), download the pinned version, **delete every stored version right away**, frames, transcript, model, validation, save (conditional on `status` and `run_id`). Every ffmpeg/ffprobe run has a timeout derived from the time left, reads at most 180.5 s, local files only, with an environment that holds no secrets. Failures carry their stage and code; one JSON log line per job.
+- **Model** — `claude-sonnet-4-6` on the direct Anthropic API (key in Secrets Manager, passed to the client in memory), effort `high`, a strict JSON schema through `messages.create`; the stop reason is checked before the answer is validated; one retry on 429, 529 or another 5xx when time allows.
+- **Storage** — S3 versioned, encrypted, public access blocked, lifecycle 1 day for current and noncurrent versions; DynamoDB on demand with TTL.
+- **Infrastructure and CI** — everything is Terraform with encrypted, versioned S3 remote state and a lockfile. GitHub Actions: `verify` (pytest with the pinned ffmpeg, web lint and build, `terraform validate`); `deploy` on a native arm runner through a GitHub OIDC role scoped to this stack (immutable subject, production environment only). It builds and pushes the image, plans with the new digest, **refuses any plan that deletes or replaces a resource**, applies, then checks that the Worker runs the new digest and the Control API answers. The web app is deployed to Vercel from the CLI.
+- **Eval** — `eval/cases` (hand labels, no videos), `eval/score.py`, and `eval/run.py`, whose gate needs at least four recorded cases, 70% status accuracy and no false Shown on negative cases. First recorded case, `todomvc-01`: 5/5 statuses, 4/4 evidence in range, 0/2 false Shown.
+- **Measured** on `todomvc-01` (65 s, 1280×720, narrated): about 93 s from queue to result — transcription 47 s, frames 17.5 s, model 11 s; 1.7 GB peak memory; 16,367 input and 377 output tokens, about $0.055.
 
 ## How This Works, In Plain Language
 

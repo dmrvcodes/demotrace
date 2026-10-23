@@ -19,7 +19,7 @@ Build mode: fast
   Learner check: Run `prepare` on one of your own short demo clips, open `out/frames`, and confirm the time written on a frame matches what you see in the video at that second.
   Commit: `Add local video preparation pipeline (frames and transcript)`
 
-- [ ] **2. A real Bedrock call from your machine returns a valid structured answer**
+- [x] **2. A real Bedrock call from your machine returns a valid structured answer**
   Becomes usable: `python -m demotrace.cli smoke` sends a small request and then one realistic request (real frames, speech and claims from slice 1, at most 16 MB) to Claude Opus 5.5 on Amazon Bedrock, prints the status, token usage and the structured answer, and saves both answers as fixtures.
   Why now: Bedrock access, the IAM action, the quota, structured output, effort `high` and the request size are the biggest unknowns, and everything after depends on them. If something fails, we learn it before building more. This is the one allowed technical-layer slice because it leaves runnable evidence of the riskiest assumption.
   PRD ref: `prd.md > Results and evidence`, `prd.md > Product Decisions` (a slide that promises a feature is Told only)
@@ -29,7 +29,7 @@ Build mode: fast
   Learner check: Confirm your console checks are done before the run. Then read the realistic answer and say whether each claim's status and explanation match what you know your video shows.
   Commit: `Add Bedrock model call with structured output and saved fixtures`
 
-- [ ] **3. You get the finished evidence map for a video and its claims, and can replay it offline**
+- [x] **3. You get the finished evidence map for a video and its claims, and can replay it offline**
   Becomes usable: `python -m demotrace.cli analyze video.mp4 --claims claims.json --out out/` prints and saves the result (status, evidence with server-computed timestamps and an explanation per claim). `--replay <fixture>` runs the validation without calling the model. Invalid references are rejected.
   Why now: This is the unique kernel working end to end on your machine — separating what a demo says from what it shows — and it gives the eval something to run.
   PRD ref: `prd.md > Results and evidence`, `prd.md > States and Boundaries` (model refusal or failure, static video, no audio)
@@ -59,7 +59,7 @@ Build mode: fast
   Learner check: Open `http://localhost:3000`, click **Try with sample**, click timestamps and markers, and say whether the look matches what you pictured.
   Commit: `Add interface with sample results, timeline and click-to-seek`
 
-- [ ] **6. The same analysis runs inside a real Lambda and writes its result to DynamoDB**
+- [x] **6. The same analysis runs inside a real Lambda and writes its result to DynamoDB**
   Becomes usable: A spike script builds the arm64 Worker image, pushes it to ECR, creates the function, a DynamoDB table and an S3 bucket, and a test event with a `job_id` makes the Lambda fetch a video, run the pipeline, call Bedrock from its own role, and store the result.
   Why now: This is the second big risk: the container with ffmpeg and faster-whisper on arm64, the IAM action from the Lambda role, and the real time and memory. It must be proven before the control API and the live interface depend on it. Time-box: finish no later than the evening of Thursday 22 October; the scope is only S3, the pinned object version, the Worker Lambda, Bedrock, the DynamoDB result and the clean-up, with no Terraform, Function URL, budgets, CORS or public site (those are later slices). No AWS call is made before your console checks are confirmed.
   PRD ref: `prd.md > States and Boundaries` (privacy, failures)
@@ -69,7 +69,7 @@ Build mode: fast
   Learner check: Upload a short video yourself with the AWS CLI, send the test event, and confirm the result row appears and the video is gone from the bucket.
   Commit: `Run the worker on Lambda with DynamoDB state and measurements`
 
-- [ ] **7. A full backend flow works: create a job, upload straight to S3, analyze, poll**
+- [x] **7. A full backend flow works: create a job, upload straight to S3, analyze, poll**
   Becomes usable: With a script, `POST /jobs` returns a token and an upload slot, the file goes to S3, `POST /jobs/{id}/analyze` queues it, and `GET /jobs/{id}` moves from queued to analyzing to done. Limits and token rules apply.
   Why now: This is the backend the interface will talk to. The state rules and the privacy rules must be proven before the live interface depends on them.
   PRD ref: `prd.md > Waiting for the analysis`, `prd.md > States and Boundaries` (daily limits, privacy)
@@ -79,7 +79,7 @@ Build mode: fast
   Learner check: Run the provided script with your own video and watch the status move to done; confirm that a request without the token is refused.
   Commit: `Add control API with job state machine and limits`
 
-- [ ] **8. Public end to end: your own video, your claims, a real result**
+- [x] **8. Public end to end: your own video, your claims, a real result**
   Becomes usable: On the deployed site, drop a video (the 3-minute and HEVC checks run first), it uploads in the background, you type claims, start, watch the waiting statuses, and get results from the live backend, with failure and capacity messages.
   Why now: This is the first moment a judge could use the real product. Everything before it exists to make this step safe. Once it works on a real clip, preparing the demo recording can start; slices 10–12 do not hold it back.
   PRD ref: `prd.md > Upload`, `prd.md > Claims`, `prd.md > Waiting for the analysis`, `prd.md > States and Boundaries`
@@ -119,7 +119,7 @@ Build mode: fast
   Learner check: Look at every miss with me and say whether the model or the label was wrong.
   Commit: `Extend eval to six videos and tune the analysis`
 
-- [ ] **12. The infrastructure is rebuilt from Terraform**
+- [x] **12. The infrastructure is rebuilt from Terraform**
   Becomes usable: `terraform plan` shows no unexpected changes and `terraform apply` recreates the S3 bucket, DynamoDB table, ECR repository, both Lambdas with roles and log groups, the Function URL, the asynchronous-invoke settings and the Budget, with the Worker image pinned by digest.
   Why now: Your plan puts it after a working end to end, so it can never delay the proof. It also makes the cleanup after judging a single command.
   PRD ref: `prd.md > States and Boundaries` (privacy, daily limits)
@@ -137,21 +137,33 @@ Build mode: fast
 
 ## Final Review
 
+Agent verification, 24 October (commit `9682ee5`, Worker `sha256:bd0f0c0a…`): CI run 40029405841 green (verify and deploy; the plan held one in-place Worker update). The live site shows the TodoMVC sample labelled as a recorded analysis; clicking `[0:24]` moved the player to 24.0 s and highlighted C2. One live analysis through the public Control API (create → presigned POST → analyze → poll) reached `completed` in 109 s: 5/5 statuses, 4/4 evidence in range, 0/2 false Shown, request id logged, no S3 version left, the same job without its token answered 404. The learner's own kick-the-tires session has not happened yet. Found by the verification, for the learner to decide:
+
+- [ ] The browser polls `GET /jobs/{id}` every 350 ms; the spec says 3 s. Several judges at once would mean several requests per second to the Control API for each of them — proposed: 2 s.
+- [ ] `prd.md > Returning to a result` (saved report and resume after closing the tab) is not built — build it or record it as deferred.
+- [ ] The eval gate needs three more recorded cases (being recorded); slice 4 stays open until `eval/run.py` passes.
+- [ ] Slice 10 live checks still to run: overwrite after `analyze`, the capacity switch at 0, the HEVC message, a reload mid-analysis.
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map
 
 - [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
 - [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: [what actually happened; real document/test/code references; unfinished work if interrupted]
-Route and stops: [actual paths and symbols; guided stops completed, or reference-only route]
-Edit outcome: [tried/kept/reverted/declined/not applicable; verification if changed]
-Reflection: [offered/answered/declined/already covered — personal answer belongs only in the ignored profile]
-Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
+Activity and evidence: the app map was generated from commit `9682ee5` and checked in a browser; every path and symbol in it was checked against the source. The learning activity itself is offered but not done yet: the proposed focused alternative is tracing how the deploy failure was diagnosed (CloudTrail showed GitHub's immutable OIDC subject, `infra/main.tf > github_deploy_subjects`).
+Route and stops: reference route only — `web/src/app/page.tsx > runLiveAnalysis`, `backend/worker/demotrace/handler.py > handler`, `backend/worker/demotrace/validate.py > assemble_result`.
+Edit outcome: not applicable yet.
+Reflection: not offered yet.
+Activity mode: not started; app map ready.
 
 ## Revisions
+
+- 24 October — slices re-scoped to what was built and verified: slice 2 runs against the direct Anthropic API instead of Bedrock (small smoke locally, the realistic call through the Lambda); slice 3's local `analyze --replay` command became the Worker's evidence map plus `lambda-smoke` and `eval/score.py` for replaying recorded runs; slice 12 manages every resource in Terraform with S3 remote state and CI applies (no destroy-and-rebuild, the plan shows no drift) — Bedrock was blocked, and rebuilding live resources two days before submission would only add risk.
+- 24 October — the model client calls `messages.create` with a strict JSON schema and checks the stop reason before validating; 529 is retried — `messages.parse` turned refusals and cut-off answers into `model_invalid_output`, and `OverloadedError` is not an `InternalServerError`.
+- 24 October — ffmpeg/ffprobe run with timeouts derived from the Lambda's remaining time, `-t 180.5`, local files only and an environment without secrets; the video is deleted from S3 right after download — with reserved concurrency 2, two hanging files could otherwise block every analysis for 15 minutes.
+- 24 October — CI tests with the same pinned ffmpeg build as the Worker image, deploys from a native arm runner, trusts GitHub's immutable OIDC subject and refuses plans that delete or replace resources — a different ffmpeg in CI failed a test, the arm image could not build on amd64, and the role never matched the subject GitHub sends.
+- 24 October — "Try with sample" shows a recorded TodoMVC analysis instead of Big Buck Bunny — the sample is the first thing judges open, and it should show the product's real output.
 
 - 23 October — Bedrock remained account-blocked, so the deployed Worker uses the authorized
   direct Anthropic API credential held in AWS Secrets Manager. The live Control API is a
