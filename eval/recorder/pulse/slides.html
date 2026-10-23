@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pulse — slides</title>
+<style>
+  body { margin: 0; height: 100vh; display: grid; place-items: center; background: #1e1b4b; color: #fff;
+    font: 18px/1.3 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  .slide { display: none; text-align: center; }
+  .slide.on { display: block; }
+  h1 { font-size: 96px; margin: 0; letter-spacing: -.03em; }
+  .sub { font-size: 34px; color: #c7d2fe; margin-top: 12px; }
+  .badge { display: inline-block; margin-top: 34px; padding: 12px 22px; border-radius: 999px; background: #f97316; font-size: 26px; font-weight: 700; }
+  h2 { font-size: 48px; margin: 0 0 26px; }
+  .shot { width: 900px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.45); border: 6px solid #312e81; }
+</style>
+</head>
+<body>
+  <section class="slide" id="s1">
+    <h1>Pulse</h1>
+    <div class="sub">Analytics for small teams</div>
+    <div class="badge">Now with AI anomaly alerts</div>
+  </section>
+  <section class="slide" id="s2">
+    <h2>Export any report to CSV</h2>
+    <img class="shot" src="pulse-shot.png" alt="">
+  </section>
+<script>
+  const n = new URLSearchParams(location.search).get("n") || "1";
+  document.getElementById("s" + n).classList.add("on");
+</script>
+</body>
+</html>

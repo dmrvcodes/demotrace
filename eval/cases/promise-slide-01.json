@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "case_id": "promise-slide-01",
+  "video": ".local/eval/videos/promise-slide-01.mp4",
+  "duration_s": 45.0,
+  "source": "Scripted headless recording of a local mock analytics app 'Pulse' and two HTML slides, narration by Amazon Polly neural voice Arthur (en-GB)",
+  "speech_ranges_s": [
+    [
+      0.5,
+      4.6
+    ],
+    [
+      6.2,
+      8.9
+    ],
+    [
+      14.7,
+      15.9
+    ],
+    [
+      19.2,
+      21.2
+    ],
+    [
+      29.2,
+      31.7
+    ],
+    [
+      41.2,
+      41.8
+    ]
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "Pulse detects traffic anomalies with AI alerts.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          0.0,
+          5.5
+        ]
+      ],
+      "negative": "promise_slide",
+      "note": "Title slide badge 'Now with AI anomaly alerts' plus narration at 0.5; no alert is ever demonstrated."
+    },
+    {
+      "id": "C2",
+      "text": "Reports can be exported to CSV.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          5.5,
+          14.0
+        ]
+      ],
+      "negative": "screenshot_in_slide",
+      "note": "Slide 5.5–14.0 embeds a screenshot of the app with the Export CSV button ringed, narrated at 6.2; in the live app the button is visible but never clicked and no file is produced."
+    },
+    {
+      "id": "C3",
+      "text": "Changing the date range updates the totals.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          20.5,
+          29.0
+        ]
+      ],
+      "negative": null,
+      "note": "'30 days' clicked at 21.0: Visitors 1,204 → 5,310, Signups 87 → 402, chart goes from 7 to 30 bars."
+    },
+    {
+      "id": "C4",
+      "text": "Users can create and share dashboards.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          29.0,
+          41.0
+        ]
+      ],
+      "negative": "partial_claim",
+      "note": "'New dashboard' clicked at 31.5 adds an 'Untitled dashboard' tab (create is shown); its Share button is visible but never clicked, so sharing is only narrated."
+    },
+    {
+      "id": "C5",
+      "text": "Pulse supports dark mode.",
+      "expected": "missing",
+      "evidence_ranges_s": [],
+      "negative": "absent_feature",
+      "note": "Light UI only; never mentioned."
+    }
+  ]
+}

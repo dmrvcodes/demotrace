@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Notely</title>
+<style>
+  :root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --brand: #059669; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: grid; grid-template-columns: 340px 1fr; color: var(--ink);
+    font: 16px/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fff; }
+  aside { border-right: 1px solid var(--line); background: #f9fafb; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .logo { font-weight: 800; font-size: 22px; color: var(--brand); }
+  input[type=search] { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; width: 100%; }
+  ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  li { padding: 12px 14px; border-radius: 10px; cursor: pointer; background: #fff; border: 1px solid var(--line); }
+  li.active { border-color: var(--brand); background: #ecfdf5; }
+  li small { display: block; color: var(--muted); font-size: 13px; }
+  .count { color: var(--muted); font-size: 13px; }
+  main { padding: 28px 36px; display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; align-items: center; justify-content: space-between; }
+  h1 { margin: 0; font-size: 28px; }
+  textarea { font: inherit; flex: 1; border: 1px solid var(--line); border-radius: 12px; padding: 16px; resize: none; }
+  button { font: inherit; padding: 9px 18px; border-radius: 10px; border: 0; background: var(--brand); color: #fff; cursor: pointer; }
+  #toast { position: fixed; right: 28px; bottom: 28px; padding: 12px 18px; border-radius: 10px; background: #111827; color: #fff;
+    font-weight: 600; display: none; }
+  #caption { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); padding: 10px 22px; border-radius: 8px;
+    background: rgba(0,0,0,.78); color: #fff; font-size: 26px; display: none; }
+</style>
+</head>
+<body>
+<aside>
+  <div class="logo">Notely</div>
+  <input type="search" id="search" placeholder="Search notes">
+  <div class="count" id="count"></div>
+  <ul id="list"></ul>
+</aside>
+<main>
+  <div class="row"><h1 id="title">Select a note</h1><button id="save">Save</button></div>
+  <textarea id="body" placeholder="Pick a note on the left"></textarea>
+</main>
+<div id="toast">Saved ✓</div>
+<div id="caption">Notes sync across all your devices</div>
+<script>
+  const notes = [
+    { title: "Meeting notes", body: "Roadmap review with design and sales." },
+    { title: "Groceries", body: "Milk, eggs, coffee beans." },
+    { title: "Trip ideas", body: "Lisbon in spring, Kyoto in autumn." },
+    { title: "Meeting agenda", body: "1. Q4 goals 2. Hiring 3. Budget" },
+    { title: "Book list", body: "The Pragmatic Programmer; Shape Up." },
+  ];
+  let current = null;
+  const list = document.getElementById("list");
+  function render() {
+    const q = document.getElementById("search").value.trim().toLowerCase();
+    const shown = notes.filter(n => n.title.toLowerCase().includes(q));
+    list.innerHTML = "";
+    for (const n of shown) {
+      const li = document.createElement("li");
+      li.className = n === current ? "active" : "";
+      li.innerHTML = `${n.title}<small>${n.body.slice(0, 32)}</small>`;
+      li.onclick = () => { current = n; document.getElementById("title").textContent = n.title;
+        document.getElementById("body").value = n.body; render(); };
+      list.appendChild(li);
+    }
+    document.getElementById("count").textContent = `${shown.length} of ${notes.length} notes`;
+  }
+  document.getElementById("search").oninput = render;
+  document.getElementById("save").onclick = () => {
+    if (current) current.body = document.getElementById("body").value;
+    const toast = document.getElementById("toast");
+    toast.style.display = "block";
+    setTimeout(() => { toast.style.display = "none"; }, 700);
+  };
+  window.showCaption = (on) => { document.getElementById("caption").style.display = on ? "block" : "none"; };
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "case_id": "similar-ui-01",
+  "video": ".local/eval/videos/similar-ui-01.mp4",
+  "duration_s": 54.0,
+  "source": "Scripted headless recording of https://the-internet.herokuapp.com (Dynamic Loading, Hovers, Add/Remove Elements), narration by Amazon Polly neural voice Arthur (en-GB)",
+  "speech_ranges_s": [
+    [
+      0.5,
+      2.3
+    ],
+    [
+      4.2,
+      6.2
+    ],
+    [
+      12.7,
+      13.4
+    ],
+    [
+      18.7,
+      21.3
+    ],
+    [
+      29.7,
+      32.1
+    ],
+    [
+      41.2,
+      44.4
+    ],
+    [
+      48.2,
+      50.3
+    ]
+  ],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "Clicking Start reveals the hidden 'Hello World!' message.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          6.0,
+          17.0
+        ]
+      ],
+      "negative": null,
+      "note": "Start clicked at 6.1, loading bar, then 'Hello World!' visible from 11.4 until the page changes at 17.3."
+    },
+    {
+      "id": "C2",
+      "text": "Users can open a user's profile page from the gallery.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          18.5,
+          27.5
+        ]
+      ],
+      "negative": "similar_ui_no_result",
+      "note": "Narrated at 18.7; from 20.0 the cursor hovers the first avatar and reveals a 'View profile' link that is never clicked, so no profile page is ever shown."
+    },
+    {
+      "id": "C3",
+      "text": "Each click on Add Element adds a new Delete button.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          30.5,
+          41.0
+        ]
+      ],
+      "negative": null,
+      "note": "Clicks at 30.9, 32.5 and 34.5 add one 'Delete' button each (0 → 3); the buttons stay until the end."
+    },
+    {
+      "id": "C4",
+      "text": "Changes are saved automatically.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          41.0,
+          44.5
+        ]
+      ],
+      "negative": "narration_only",
+      "note": "'As you can see, the app also saves your changes automatically' at 41.2 while nothing on screen indicates saving."
+    },
+    {
+      "id": "C5",
+      "text": "Users can sign in with Google.",
+      "expected": "missing",
+      "evidence_ranges_s": [],
+      "negative": "absent_feature",
+      "note": "Never mentioned or shown."
+    }
+  ]
+}

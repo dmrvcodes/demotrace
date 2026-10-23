@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pulse — dashboard</title>
+<style>
+  :root { --ink: #111827; --muted: #6b7280; --line: #e5e7eb; --brand: #4f46e5; --bg: #f8fafc; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 32px; background: #fff; border-bottom: 1px solid var(--line); }
+  .logo { font-weight: 800; font-size: 20px; color: var(--brand); letter-spacing: -.02em; }
+  .tabs { display: flex; gap: 6px; margin-left: 18px; }
+  .tab { padding: 7px 12px; border-radius: 8px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .tab.active { background: #eef2ff; color: var(--brand); font-weight: 600; }
+  .tab .share { font-size: 12px; padding: 3px 8px; border: 1px solid #c7d2fe; border-radius: 6px; background: #fff; color: var(--brand); }
+  .spacer { flex: 1; }
+  button { font: inherit; cursor: pointer; }
+  .btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn.highlight { outline: 4px solid #f97316; outline-offset: 3px; }
+  main { padding: 28px 32px; }
+  .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  h1 { margin: 0; font-size: 24px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .seg button { border: 0; background: transparent; padding: 8px 16px; color: var(--muted); }
+  .seg button.on { background: var(--ink); color: #fff; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; }
+  .card .label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+  .card .value { font-size: 34px; font-weight: 700; margin-top: 6px; }
+  .chart { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px; height: 250px; display: flex; align-items: flex-end; gap: 6px; }
+  .bar { flex: 1; background: #a5b4fc; border-radius: 4px 4px 0 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Pulse</div>
+  <nav class="tabs" id="tabs"><div class="tab active">Overview</div></nav>
+  <div class="spacer"></div>
+  <button class="btn" id="export">Export CSV</button>
+  <button class="btn primary" id="new">New dashboard</button>
+</header>
+<main>
+  <div class="toolbar">
+    <h1>Traffic overview</h1>
+    <div class="seg"><button id="r7" class="on">7 days</button><button id="r30">30 days</button></div>
+  </div>
+  <div class="cards">
+    <div class="card"><div class="label">Visitors</div><div class="value" id="visitors"></div></div>
+    <div class="card"><div class="label">Signups</div><div class="value" id="signups"></div></div>
+    <div class="card"><div class="label">Conversion</div><div class="value" id="conv"></div></div>
+  </div>
+  <div class="chart" id="chart"></div>
+</main>
+<script>
+  const DATA = {
+    7: { visitors: "1,204", signups: "87", conv: "7.2%", n: 7 },
+    30: { visitors: "5,310", signups: "402", conv: "7.6%", n: 30 },
+  };
+  function render(days) {
+    const d = DATA[days];
+    document.getElementById("visitors").textContent = d.visitors;
+    document.getElementById("signups").textContent = d.signups;
+    document.getElementById("conv").textContent = d.conv;
+    document.getElementById("r7").classList.toggle("on", days === 7);
+    document.getElementById("r30").classList.toggle("on", days === 30);
+    const chart = document.getElementById("chart");
+    chart.innerHTML = "";
+    for (let i = 0; i < d.n; i++) {
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      bar.style.height = (35 + 55 * Math.abs(Math.sin(i * 1.7 + days))) + "%";
+      chart.appendChild(bar);
+    }
+  }
+  document.getElementById("r7").onclick = () => render(7);
+  document.getElementById("r30").onclick = () => render(30);
+  document.getElementById("new").onclick = () => {
+    const tabs = document.getElementById("tabs");
+    tabs.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    const tab = document.createElement("div");
+    tab.className = "tab active";
+    tab.innerHTML = 'Untitled dashboard <button class="share">Share</button>';
+    tabs.appendChild(tab);
+  };
+  if (location.search.includes("highlight=export")) document.getElementById("export").classList.add("highlight");
+  render(7);
+</script>
+</body>
+</html>

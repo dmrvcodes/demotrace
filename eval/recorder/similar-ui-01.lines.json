@@ -1,0 +1,9 @@
+[
+  {"t": 0.3, "text": "Here's a quick tour of our testing playground."},
+  {"t": 4.0, "text": "First, I'll reveal the hidden message."},
+  {"t": 12.5, "text": "And there it is."},
+  {"t": 18.5, "text": "From the gallery, you can open any user's profile."},
+  {"t": 29.5, "text": "Each click on Add Element adds a new Delete button."},
+  {"t": 41.0, "text": "As you can see, the app also saves your changes automatically."},
+  {"t": 48.0, "text": "That's the tour. Thanks for watching."}
+]

@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "case_id": "silent-missing-01",
+  "video": ".local/eval/videos/silent-missing-01.mp4",
+  "duration_s": 33.0,
+  "source": "Scripted headless recording of a local mock notes app 'Notely'; no audio track",
+  "speech_ranges_s": [],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "Saving a note shows a confirmation.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          9.2,
+          9.9
+        ]
+      ],
+      "negative": null,
+      "note": "'Saved ✓' toast visible only 9.2–9.9, strictly between the 9 s and 10 s samples. Tests transient events: with 1 fps sampling a miss here is a known pipeline limit, not a labelling error."
+    },
+    {
+      "id": "C2",
+      "text": "Search filters the notes list as you type.",
+      "expected": "shown",
+      "evidence_ranges_s": [
+        [
+          14.0,
+          23.0
+        ]
+      ],
+      "negative": null,
+      "note": "Typing 'meeting' from 14.0; the list goes from '5 of 5 notes' to '2 of 5 notes' by 15.6 and stays filtered."
+    },
+    {
+      "id": "C3",
+      "text": "Notes sync across all your devices.",
+      "expected": "told_only",
+      "evidence_ranges_s": [
+        [
+          23.0,
+          30.0
+        ]
+      ],
+      "negative": "caption_only",
+      "note": "On-screen caption only (23.0–30.0); there is no narration and nothing demonstrates syncing."
+    },
+    {
+      "id": "C4",
+      "text": "Notes can be shared via a public link.",
+      "expected": "missing",
+      "evidence_ranges_s": [],
+      "negative": "silent_missing",
+      "note": "Never mentioned or shown."
+    }
+  ]
+}
