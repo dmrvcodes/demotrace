@@ -1,6 +1,6 @@
-"""The client wrapper against a stub: no network, no AWS, no cost."""
+"""The model client through the real Anthropic SDK, with the HTTP transport mocked: no network, no cost."""
 
-from types import SimpleNamespace
+import json
 
 import anthropic
 import httpx2
@@ -21,28 +21,32 @@ ANSWER = ModelAnswer.model_validate({"claims": [
 ]})
 
 
-def response(stop_reason="end_turn", parsed=ANSWER, category=None):
-    return SimpleNamespace(
-        stop_reason=stop_reason,
-        stop_details=SimpleNamespace(category=category) if category else None,
-        parsed_output=parsed,
-        usage=SimpleNamespace(to_dict=lambda: {"input_tokens": 1200, "output_tokens": 300}),
-        _request_id="req_test",
-    )
+def message(stop_reason="end_turn", text=None, extra=None):
+    content = [] if text is None and stop_reason == "refusal" else [{"type": "text", "text": text or ANSWER.model_dump_json()}]
+    body = {"id": "msg_1", "type": "message", "role": "assistant", "model": "test-model", "content": content,
+            "stop_reason": stop_reason, "stop_sequence": None,
+            "usage": {"input_tokens": 1200, "output_tokens": 300}, **(extra or {})}
+    return httpx2.Response(200, json=body, headers={"request-id": "req_ok"})
 
 
-class StubClient:
-    def __init__(self, *outcomes):
-        self.outcomes = list(outcomes)
-        self.calls = []
-        self.messages = self
+def error(status, kind):
+    return httpx2.Response(status, json={"type": "error", "error": {"type": kind, "message": kind}},
+                           headers={"request-id": f"req_{status}"})
 
-    def parse(self, **kwargs):
-        self.calls.append(kwargs)
-        outcome = self.outcomes.pop(0)
-        if isinstance(outcome, BaseException):
-            raise outcome
-        return outcome
+
+class Server:
+    """Answers queued responses in order and records every request body."""
+
+    def __init__(self, *responses):
+        self.responses = list(responses)
+        self.bodies = []
+
+    def __call__(self, request):
+        self.bodies.append(json.loads(request.content))
+        return self.responses.pop(0)
+
+    def client(self):
+        return llm.make_client("sk-ant-test", http_client=anthropic.DefaultHttpxClient(transport=httpx2.MockTransport(self)))
 
 
 def request():
@@ -50,66 +54,92 @@ def request():
     return build_request(media, images, claims)
 
 
-def connection_error():
-    return anthropic.APIConnectionError(request=httpx2.Request("POST", "https://bedrock-mantle.invalid"))
-
-
 @pytest.fixture(autouse=True)
 def no_sleep(monkeypatch):
     monkeypatch.setattr(llm.time, "sleep", lambda s: None)
 
 
-def test_returns_the_parsed_answer_with_usage():
-    stub = StubClient(response())
-    result = llm.call_model(stub, request())
-    assert result.answer == ANSWER
-    assert result.usage["input_tokens"] == 1200 and result.request_id == "req_test"
-    sent = stub.calls[0]
-    assert sent["output_format"] is ModelAnswer
-    assert sent["output_config"] == {"effort": "high"}
+def call(server, **kw):
+    return llm.call_model(server.client(), request(), **kw)
+
+
+def test_returns_the_validated_answer_with_usage_and_request_id():
+    server = Server(message())
+    result = call(server)
+    assert result.answer == ANSWER and result.request_id == "req_ok"
+    assert result.usage["input_tokens"] == 1200
+    sent = server.bodies[0]
+    assert sent["output_config"]["effort"] == "high"
+    assert sent["output_config"]["format"] == {"type": "json_schema", "schema": llm.ANSWER_SCHEMA}
+
+
+def test_schema_matches_the_answer_model():
+    item = llm.ANSWER_SCHEMA["properties"]["claims"]["items"]
+    assert set(item["properties"]) == set(item["required"]) == set(ModelAnswer.model_fields["claims"].annotation.__args__[0].model_fields)
+
+
+def test_overloaded_529_is_retried_once():
+    server = Server(error(529, "overloaded_error"), message())
+    assert call(server).answer == ANSWER
+    assert len(server.bodies) == 2
+
+
+def test_other_5xx_is_retried_once_then_unavailable():
+    server = Server(error(503, "api_error"), error(503, "api_error"))
+    with pytest.raises(ModelError) as err:
+        call(server)
+    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE and err.value.request_id == "req_503"
+    assert len(server.bodies) == 2
+
+
+def test_no_retry_when_the_lambda_is_running_out_of_time():
+    server = Server(error(529, "overloaded_error"), message())
+    with pytest.raises(ModelError) as err:
+        call(server, time_left_s=lambda: 300)
+    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE and len(server.bodies) == 1
+
+
+def test_refusal_is_reported_as_a_refusal_not_invalid_output():
+    server = Server(message("refusal", extra={"stop_details": {"type": "refusal", "category": "cyber", "explanation": None}}))
+    with pytest.raises(ModelError) as err:
+        call(server)
+    assert err.value.code == ErrorCode.MODEL_REFUSED and err.value.request_id == "req_ok"
+
+
+def test_cut_off_answer_is_reported_as_cut_off():
+    server = Server(message("max_tokens", text='{"claims": [{"claim_id": "C1", "evid'))
+    with pytest.raises(ModelError) as err:
+        call(server)
+    assert err.value.code == ErrorCode.MODEL_INVALID_OUTPUT and "cut off" in err.value.detail
+
+
+def test_request_too_large_413():
+    with pytest.raises(ModelError) as err:
+        call(Server(error(413, "request_too_large")))
+    assert err.value.code == ErrorCode.REQUEST_TOO_LARGE
+
+
+def test_bad_request_is_rejected_without_retry():
+    server = Server(error(400, "invalid_request_error"))
+    with pytest.raises(ModelError) as err:
+        call(server)
+    assert err.value.code == ErrorCode.MODEL_REJECTED_REQUEST and len(server.bodies) == 1
+
+
+def test_auth_failure_is_unavailable():
+    with pytest.raises(ModelError) as err:
+        call(Server(error(401, "authentication_error")))
+    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE
+
+
+def test_answer_that_breaks_the_schema_is_invalid():
+    with pytest.raises(ModelError) as err:
+        call(Server(message(text='{"claims": [{"claim_id": "C1"}]}')))
+    assert err.value.code == ErrorCode.MODEL_INVALID_OUTPUT
 
 
 def test_client_requires_an_api_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(ModelError) as err:
         llm.make_client()
-    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE
-    assert "ANTHROPIC_API_KEY" in err.value.detail
-
-
-def test_refusal_fails_with_its_category():
-    with pytest.raises(ModelError) as err:
-        llm.call_model(StubClient(response("refusal", parsed=None, category="cyber")), request())
-    assert err.value.code == ErrorCode.MODEL_REFUSED and err.value.detail == "cyber"
-
-
-def test_cut_off_answer_is_invalid():
-    with pytest.raises(ModelError) as err:
-        llm.call_model(StubClient(response("max_tokens")), request())
-    assert err.value.code == ErrorCode.MODEL_INVALID_OUTPUT
-
-
-def test_missing_parsed_answer_is_invalid():
-    with pytest.raises(ModelError) as err:
-        llm.call_model(StubClient(response(parsed=None)), request())
-    assert err.value.code == ErrorCode.MODEL_INVALID_OUTPUT
-
-
-def test_one_retry_on_a_network_error_when_time_allows():
-    stub = StubClient(connection_error(), response())
-    assert llm.call_model(stub, request()).answer == ANSWER
-    assert len(stub.calls) == 2
-
-
-def test_no_retry_when_the_lambda_is_running_out_of_time():
-    stub = StubClient(connection_error(), response())
-    with pytest.raises(ModelError) as err:
-        llm.call_model(stub, request(), time_left_s=lambda: 300)
-    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE and len(stub.calls) == 1
-
-
-def test_only_one_retry():
-    stub = StubClient(connection_error(), connection_error(), response())
-    with pytest.raises(ModelError):
-        llm.call_model(stub, request())
-    assert len(stub.calls) == 2
+    assert err.value.code == ErrorCode.MODEL_UNAVAILABLE and "ANTHROPIC_API_KEY" in err.value.detail
