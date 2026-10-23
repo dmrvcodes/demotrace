@@ -116,8 +116,16 @@ resource "aws_iam_role_policy" "github_deploy" {
   name = "demotrace-deploy-only"
   role = aws_iam_role.github_deploy.id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
-    # AWS provider discovery calls are read-only; write actions are scoped below.
-    { Effect = "Allow", Action = ["sts:GetCallerIdentity", "ec2:DescribeAvailabilityZones", "iam:GetRole", "iam:GetRolePolicy", "iam:ListRolePolicies", "iam:ListAttachedRolePolicies", "lambda:GetFunction", "lambda:GetFunctionUrlConfig", "lambda:GetFunctionEventInvokeConfig", "dynamodb:DescribeTable", "ecr:DescribeRepositories", "ecr:DescribeImages", "logs:DescribeLogGroups", "secretsmanager:DescribeSecret", "s3:GetBucket*", "s3:ListBucket"], Resource = "*" },
+    # Reads for `terraform plan` (refreshing every resource in this stack), scoped to this stack's
+    # ARNs; Get*/List*/Describe* so a provider upgrade that reads one more attribute does not break CI.
+    { Effect = "Allow", Action = ["sts:GetCallerIdentity", "ec2:DescribeAvailabilityZones", "logs:DescribeLogGroups"], Resource = "*" },
+    { Effect = "Allow", Action = ["s3:Get*", "s3:ListBucket"], Resource = [aws_s3_bucket.videos.arn] },
+    { Effect = "Allow", Action = ["dynamodb:Describe*", "dynamodb:ListTagsOfResource"], Resource = aws_dynamodb_table.jobs.arn },
+    { Effect = "Allow", Action = ["ecr:Describe*", "ecr:List*", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:GetRepositoryPolicy"], Resource = aws_ecr_repository.worker.arn },
+    { Effect = "Allow", Action = ["lambda:Get*", "lambda:List*"], Resource = "arn:aws:lambda:us-east-1:623588627433:function:demotrace-*" },
+    { Effect = "Allow", Action = ["logs:Describe*", "logs:List*"], Resource = ["arn:aws:logs:us-east-1:623588627433:log-group:/aws/lambda/demotrace-*", "arn:aws:logs:us-east-1:623588627433:log-group:/aws/lambda/demotrace-*:*"] },
+    { Effect = "Allow", Action = ["iam:Get*", "iam:List*"], Resource = ["arn:aws:iam::623588627433:role/demotrace-*", aws_iam_openid_connect_provider.github.arn] },
+    { Effect = "Allow", Action = ["secretsmanager:DescribeSecret", "secretsmanager:GetResourcePolicy"], Resource = aws_secretsmanager_secret.anthropic.arn },
     { Effect = "Allow", Action = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], Resource = "arn:aws:s3:::demotrace-623588627433-us-east-1-tfstate/production/*" },
     { Effect = "Allow", Action = ["s3:ListBucket"], Resource = "arn:aws:s3:::demotrace-623588627433-us-east-1-tfstate" },
     { Effect = "Allow", Action = ["ecr:GetAuthorizationToken"], Resource = "*" },
