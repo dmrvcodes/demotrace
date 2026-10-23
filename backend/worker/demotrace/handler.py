@@ -22,10 +22,13 @@ from .llm import ModelError
 from .llm.client import call_model, make_client
 from .llm.prompt import build_request
 from .media import MediaError
-from .prepare import prepare
-from .smoke import load_frames
 from .stages import StageTracker
 from .validate import assemble_result, confidences
+
+# Assigned lazily after the Lambda owns a job. Keeping these injectable preserves fast unit tests
+# and avoids importing faster-whisper in Lambda's constrained init phase.
+prepare = None
+load_frames = None
 
 # What a stage's unexpected failure means when the error carries no code of its own.
 STAGE_FALLBACK = {
@@ -112,6 +115,17 @@ def handler(event, context):
 
     item = claimed["Attributes"]
     key, version, claims = item["key"], item["version_id"], item["claims"]
+
+    # Importing faster-whisper and its native dependencies during Lambda initialization exceeded
+    # the platform's 10-second init phase on a fresh arm64 container. Keep module init limited to
+    # the lightweight state-machine path; pay this cost only after this invocation owns a job.
+    global prepare, load_frames
+    if prepare is None:
+        from .prepare import prepare as prepare_impl
+        prepare = prepare_impl
+    if load_frames is None:
+        from .smoke import load_frames as load_frames_impl
+        load_frames = load_frames_impl
 
     tracker = StageTracker()
     info: dict = {}
