@@ -27,7 +27,7 @@ export function UploadView({ error, fileName, onFileSelected, onTrySample }: Upl
       <div className="sample-cta">
         <div>
           <p className="eyebrow">No video handy?</p>
-          <p>Inspect a sample evidence map without uploading anything.</p>
+          <p>See a recorded Claude analysis of a scripted TodoMVC demo, without uploading anything.</p>
         </div>
         <button className="secondary-button" onClick={onTrySample} type="button">
           Try with sample

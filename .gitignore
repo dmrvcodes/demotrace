@@ -19,7 +19,7 @@
 *.m4v
 *.webm
 *.mkv
-!web/public/samples/demotrace-sample.mp4
+!web/public/samples/todomvc-sample.mp4
 /eval/runs/
 
 # Python

@@ -1,4 +1,5 @@
 import type { AnalysisResult } from "@/lib/types";
+import { SAMPLE_NOTE } from "@/lib/sample";
 import { ClaimCard } from "./claim-card";
 import { Timeline } from "./timeline";
 
@@ -30,8 +31,9 @@ export function ResultsView({
       <div className="results-main">
         <div className="results-heading">
           <div>
-            <p className="eyebrow">{isSample ? "Example analysis" : "Live analysis"}</p>
+            <p className="eyebrow">{isSample ? "Recorded analysis · sample" : "Live analysis"}</p>
             <h2 id="analysis-title">Evidence map</h2>
+            {isSample && <p className="sample-note">{SAMPLE_NOTE}</p>}
           </div>
           <span className="result-count">{result.claims.length} claims</span>
         </div>

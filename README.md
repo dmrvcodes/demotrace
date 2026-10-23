@@ -72,9 +72,10 @@ is made before that gate passes.
 
 ## Attribution
 
-The current UI sample includes a DemoTrace-authored promise slide and an excerpt of **Big Buck
-Bunny** by the Blender Foundation, licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
-It is an interactive example only; it is not presented as a live model result. It will be replaced
-with an owned TodoMVC evidence-map sample before submission.
+The **Try with sample** video is a scripted recording of the
+[TodoMVC demo](https://demo.playwright.dev/todomvc) hosted by Playwright. TodoMVC is MIT-licensed.
+The narration is generated with Amazon Polly (neural voice Arthur). The evidence map shown with it is
+a real, recorded result from the deployed Worker (`claude-sonnet-4-6`), labelled in the interface as
+a recorded analysis rather than a live one.
 
 Built with the Devpost Learn Skill Pack for **Build With AI: Basics**.

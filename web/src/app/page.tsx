@@ -6,7 +6,7 @@ import { ResultsView } from "@/components/results-view";
 import { UploadView } from "@/components/upload-view";
 import { WaitingView } from "@/components/waiting-view";
 import { createJob, getJob, startAnalysis, uploadVideo, type JobStatus } from "@/lib/api";
-import { sampleAnalysis } from "@/lib/sample";
+import { SAMPLE_VIDEO, sampleAnalysis } from "@/lib/sample";
 
 export default function Home() {
   const isLive = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
@@ -15,7 +15,7 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [videoSrc, setVideoSrc] = useState("/samples/demotrace-sample.mp4");
+  const [videoSrc, setVideoSrc] = useState(SAMPLE_VIDEO);
   const [claims, setClaims] = useState(["", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,7 +68,7 @@ export default function Home() {
         <span className="environment-label">{isLive ? "LIVE ANALYSIS" : "LOCAL FIXTURE MODE"}</span>
       </header>
       <main>
-        {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc("/samples/demotrace-sample.mp4"); setIsSample(true); setScreen("results"); }} />}
+        {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc(SAMPLE_VIDEO); setIsSample(true); setScreen("results"); }} />}
         {screen === "claims" && <ClaimsView busy={busy} claims={claims} error={error} onChange={setClaims} onStart={runLiveAnalysis} />}
         {screen === "waiting" && <WaitingView status={job?.status === "processing" ? "processing" : "queued"} />}
         {screen === "results" && (
