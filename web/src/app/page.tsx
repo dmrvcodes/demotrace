@@ -9,6 +9,7 @@ import { createJob, getJob, startAnalysis, uploadVideo, type JobStatus } from "@
 import { sampleAnalysis } from "@/lib/sample";
 
 export default function Home() {
+  const isLive = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
   const [screen, setScreen] = useState<"upload" | "claims" | "waiting" | "results">("upload");
   const [activeClaimId, setActiveClaimId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -47,7 +48,7 @@ export default function Home() {
           <span className="wordmark__mark">D</span>
           <span>DemoTrace</span>
         </button>
-        <span className="environment-label">LOCAL FIXTURE MODE</span>
+        <span className="environment-label">{isLive ? "LIVE ANALYSIS" : "LOCAL FIXTURE MODE"}</span>
       </header>
       <main>
         {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc("/samples/demotrace-sample.mp4"); setScreen("results"); }} />}
