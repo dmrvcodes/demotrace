@@ -1,17 +1,18 @@
 """Extract candidate frames with ffmpeg: one per second plus scene changes, scaled to 1024 px."""
 
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from demotrace_shared.errors import ErrorCode
-from demotrace_shared.limits import FRAME_MAX_SIDE, FRAME_SAMPLING_STEP_S
+from demotrace_shared.limits import DURATION_TOLERANCE_S, FRAME_MAX_SIDE, FRAME_SAMPLING_STEP_S, MAX_DURATION_S
 
-from . import MediaError, ffmpeg_bin
+from . import PROTOCOLS, MediaError, ffmpeg_bin, run_tool
 from .probe import ProbeInfo
 
 SCENE_THRESHOLD = 0.3
+FRAMES_TIMEOUT_S = 180
+MAX_READ_S = MAX_DURATION_S + DURATION_TOLERANCE_S  # 180.5
 CANDIDATE_JPEG_QSCALE = 3  # ffmpeg's -q:v scale, 2 (best) to 31 (worst)
 
 _PTS_TIME = re.compile(r"\bpts_time:\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)")
@@ -43,18 +44,18 @@ def parse_showinfo_times(stderr: str) -> list[float]:
 
 def extract_candidates(video: Path, info: ProbeInfo, out_dir: Path) -> list[Candidate]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
+    result = run_tool(
         [
-            ffmpeg_bin(), "-hide_banner", "-nostdin", "-loglevel", "info",
+            ffmpeg_bin(), "-hide_banner", "-nostdin", "-loglevel", "info", *PROTOCOLS,
             "-i", str(video),
+            "-t", str(MAX_READ_S),  # never read past the length limit, whatever the container claims
             "-map", "0:v:0",
             "-vf", frame_filter(),
             "-fps_mode", "vfr",
             "-q:v", str(CANDIDATE_JPEG_QSCALE),
             str(out_dir / "cand_%05d.jpg"),
         ],
-        capture_output=True,
-        text=True,
+        cap_s=FRAMES_TIMEOUT_S, what="frame extraction",
     )
     if result.returncode != 0:
         raise MediaError(ErrorCode.UNREADABLE_VIDEO, result.stderr.strip()[-300:])

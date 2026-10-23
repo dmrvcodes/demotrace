@@ -21,6 +21,7 @@ from demotrace_shared.errors import ERROR_MESSAGES, ErrorCode
 from .llm import ModelError
 from .llm.client import call_model, make_client
 from .llm.prompt import build_request
+from . import media as media_tools
 from .media import MediaError
 from .stages import StageTracker
 from .validate import assemble_result, confidences
@@ -86,7 +87,10 @@ def _delete_all_versions(s3, bucket: str, key: str) -> None:
             if entry["Key"] == key
         ]
         if objects:
-            s3.delete_objects(Bucket=bucket, Delete={"Objects": objects, "Quiet": True})
+            response = s3.delete_objects(Bucket=bucket, Delete={"Objects": objects, "Quiet": True})
+            if response.get("Errors"):
+                codes = sorted({e.get("Code", "?") for e in response["Errors"]})
+                raise RuntimeError(f"{len(response['Errors'])} versions not deleted: {', '.join(codes)}")
 
 
 def handler(event, context):
@@ -127,8 +131,10 @@ def handler(event, context):
         from .smoke import load_frames as load_frames_impl
         load_frames = load_frames_impl
 
+    media_tools.set_deadline(context.get_remaining_time_in_millis() / 1000)
     tracker = StageTracker()
     info: dict = {}
+    deleted = False
     mine = {":processing": "processing", ":run": run_id}
     ownership = "#s=:processing AND run_id=:run"
     try:
@@ -137,17 +143,24 @@ def handler(event, context):
             video = work / "input"
             with tracker.stage("download"):
                 s3.download_file(os.environ["VIDEOS_BUCKET_NAME"], key, str(video), ExtraArgs={"VersionId": version})
+            # The local copy is all the pipeline needs: remove every stored version now, so the
+            # video leaves S3 even if a later stage hangs until the Lambda times out.
+            try:
+                _delete_all_versions(s3, os.environ["VIDEOS_BUCKET_NAME"], key)
+                deleted = True
+            except Exception as error:  # retried in `finally`; the lifecycle rule is the backstop
+                _log(job_id=job_id, outcome="cleanup_retry", error_type=type(error).__name__)
             media = prepare(video, work / "prepared", tracker=tracker)
             info.update(frames=len(media.frames), segments=len(media.segments))
             with tracker.stage("secret"):
-                os.environ["ANTHROPIC_API_KEY"] = _api_key(secrets)
+                api_key = _api_key(secrets)  # kept in memory only, never in the environment
             with tracker.stage("model"):
                 request = build_request(media, load_frames(work / "prepared", media), claims)
                 info.update(model=request.params["model"], request_bytes=request.size_bytes)
-                result = call_model(make_client(), request,
+                result = call_model(make_client(api_key), request,
                                     time_left_s=lambda: context.get_remaining_time_in_millis() / 1000)
                 info.update(input_tokens=result.usage.get("input_tokens"),
-                            output_tokens=result.usage.get("output_tokens"))
+                            output_tokens=result.usage.get("output_tokens"), request_id=result.request_id)
             with tracker.stage("validate"):
                 payload = assemble_result(media, result.answer, claims)
         with tracker.stage("save"):
@@ -170,6 +183,8 @@ def handler(event, context):
             _log(job_id=job_id, outcome="superseded", stage=stage, durations_s=tracker.durations, **info)
             return {"outcome": "superseded"}
         code = error_code(error, stage)
+        if getattr(error, "request_id", None):
+            info["request_id"] = error.request_id
         _log(job_id=job_id, outcome="failed", stage=stage, error_type=type(error).__name__, code=str(code),
              durations_s=tracker.durations, **info)
         try:
@@ -189,7 +204,9 @@ def handler(event, context):
             _log(job_id=job_id, outcome="superseded", stage=stage)
         return {"outcome": "failed", "code": str(code), "stage": stage}
     finally:
-        try:
-            _delete_all_versions(s3, os.environ["VIDEOS_BUCKET_NAME"], key)
-        except Exception as error:  # the S3 lifecycle rule is the backstop
-            _log(job_id=job_id, outcome="cleanup_error", error_type=type(error).__name__)
+        media_tools.set_deadline(None)
+        if not deleted:
+            try:
+                _delete_all_versions(s3, os.environ["VIDEOS_BUCKET_NAME"], key)
+            except Exception as error:  # the S3 lifecycle rule is the backstop
+                _log(job_id=job_id, outcome="cleanup_error", error_type=type(error).__name__)

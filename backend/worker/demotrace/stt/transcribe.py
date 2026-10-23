@@ -1,7 +1,6 @@
 """Speech to text with faster-whisper; segment times are moved onto the video's own timeline."""
 
 import os
-import subprocess
 import wave
 from pathlib import Path
 
@@ -10,12 +9,14 @@ import numpy as np
 from demotrace_shared.errors import ErrorCode
 from demotrace_shared.media import SpeechSegment
 
-from ..media import MediaError, ffmpeg_bin
+from ..media import PROTOCOLS, MediaError, ffmpeg_bin, run_tool
+from ..media.frames import MAX_READ_S
 from ..media.probe import ProbeInfo
 
 # Locally a model size is downloaded once into the Hugging Face cache; in Lambda this is a path
 # under /opt/models baked into the image. The size is chosen by measurement, not in advance.
 DEFAULT_MODEL = "small.en"
+AUDIO_TIMEOUT_S = 120
 
 _models: dict[str, object] = {}
 
@@ -38,14 +39,14 @@ def load_model(name: str):
 
 
 def extract_audio(video: Path, wav: Path) -> None:
-    result = subprocess.run(
+    result = run_tool(
         [
-            ffmpeg_bin(), "-hide_banner", "-nostdin", "-loglevel", "error", "-y",
-            "-i", str(video), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
+            ffmpeg_bin(), "-hide_banner", "-nostdin", "-loglevel", "error", "-y", *PROTOCOLS,
+            "-i", str(video), "-t", str(MAX_READ_S),
+            "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le",
             str(wav),
         ],
-        capture_output=True,
-        text=True,
+        cap_s=AUDIO_TIMEOUT_S, what="audio extraction",
     )
     if result.returncode != 0:
         raise MediaError(ErrorCode.UNREADABLE_VIDEO, "audio: " + result.stderr.strip()[-300:])

@@ -1,6 +1,7 @@
 """The worker handler against in-memory fakes: no AWS, no model, no ffmpeg."""
 
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -59,8 +60,10 @@ class FakeTable:
 
 
 class FakeS3:
-    def __init__(self, download_error=None):
+    def __init__(self, download_error=None, delete_errors=0, events=None):
         self.download_error = download_error
+        self.delete_errors = delete_errors  # how many delete_objects calls report Errors
+        self.events = events if events is not None else []
         self.deleted = []
 
     def download_file(self, bucket, key, path, ExtraArgs):
@@ -78,7 +81,12 @@ class FakeS3:
         return [{"Versions": [{"Key": "incoming/job-1", "VersionId": "v1"}], "DeleteMarkers": []}]
 
     def delete_objects(self, **kw):
+        self.events.append("delete")
+        if self.delete_errors:
+            self.delete_errors -= 1
+            return {"Errors": [{"Key": "incoming/job-1", "VersionId": "v1", "Code": "AccessDenied"}]}
         self.deleted.append(kw)
+        return {}
 
 
 class FakeSecrets:
@@ -118,7 +126,7 @@ def run(monkeypatch, capsys, *, table=None, s3=None, prepare_error=None, model_e
     monkeypatch.setattr(worker, "prepare", fake_prepare)
     monkeypatch.setattr(worker, "load_frames", lambda d, m: [b"x", b"y"])
     monkeypatch.setattr(worker, "build_request", lambda m, i, c: ModelRequest({"model": "test-model"}, 1234))
-    monkeypatch.setattr(worker, "make_client", lambda: object())
+    monkeypatch.setattr(worker, "make_client", lambda api_key=None: object())
     monkeypatch.setattr(worker, "call_model", fake_call)
     out = worker.handler(dict(EVENT), CONTEXT)
     logs = [json.loads(line) for line in capsys.readouterr().out.splitlines() if line.startswith("{")]
@@ -177,7 +185,7 @@ def test_worker_event_only_needs_the_job_id(env, monkeypatch, capsys):
     monkeypatch.setattr(worker, "prepare", lambda *args, **kwargs: MEDIA)
     monkeypatch.setattr(worker, "load_frames", lambda *args: [b"x"])
     monkeypatch.setattr(worker, "build_request", lambda *args: ModelRequest({"model": "test-model"}, 1))
-    monkeypatch.setattr(worker, "make_client", lambda: object())
+    monkeypatch.setattr(worker, "make_client", lambda api_key=None: object())
     monkeypatch.setattr(worker, "call_model", lambda *args, **kwargs: ModelResult(GOOD, {}, "end_turn", "req", 0.1))
     assert worker.handler({"job_id": "job-1"}, CONTEXT) == {"outcome": "completed"}
 
@@ -198,3 +206,46 @@ def test_completion_after_a_timeout_is_superseded(env, monkeypatch, capsys):
     assert out == {"outcome": "superseded"}
     assert not any(":failed" in u["ExpressionAttributeValues"] for u in table.updates)
     assert logs[-1]["outcome"] == "superseded"
+
+
+def stub_pipeline(monkeypatch, table, s3, *, make_client=lambda api_key=None: object(), call_model=None):
+    monkeypatch.setattr(worker, "_clients", lambda: (table, s3, FakeSecrets()))
+    monkeypatch.setattr(worker, "prepare", lambda *a, **k: MEDIA)
+    monkeypatch.setattr(worker, "load_frames", lambda *a: [b"x", b"y"])
+    monkeypatch.setattr(worker, "build_request", lambda *a: ModelRequest({"model": "test-model"}, 1))
+    monkeypatch.setattr(worker, "make_client", make_client)
+    monkeypatch.setattr(worker, "call_model", call_model or (
+        lambda *a, **k: ModelResult(answer=GOOD, usage={}, stop_reason="end_turn", request_id="req", elapsed_s=0.1)))
+
+
+def test_key_goes_to_the_client_never_into_the_environment(env, monkeypatch):
+    seen = {}
+
+    def recording_make_client(api_key=None):
+        seen["key"] = api_key
+        return object()
+
+    stub_pipeline(monkeypatch, FakeTable(), FakeS3(), make_client=recording_make_client)
+    assert worker.handler(dict(EVENT), CONTEXT) == {"outcome": "completed"}
+    assert seen["key"] == "sk-ant-test-secret"
+    assert "ANTHROPIC_API_KEY" not in os.environ
+
+
+def test_video_leaves_s3_before_the_model_is_called(env, monkeypatch):
+    events = []
+
+    def recording_call(client, request, time_left_s):
+        events.append("model")
+        return ModelResult(answer=GOOD, usage={}, stop_reason="end_turn", request_id="req", elapsed_s=0.1)
+
+    stub_pipeline(monkeypatch, FakeTable(), FakeS3(events=events), call_model=recording_call)
+    assert worker.handler(dict(EVENT), CONTEXT) == {"outcome": "completed"}
+    assert events == ["delete", "model"]  # deleted once, early; no second delete in finally
+
+
+def test_reported_delete_errors_are_retried_in_finally(env, monkeypatch, capsys):
+    s3 = FakeS3(delete_errors=1)
+    out, table, s3, logs = run(monkeypatch, capsys, s3=s3)
+    assert out == {"outcome": "completed"}
+    assert s3.events == ["delete", "delete"] and len(s3.deleted) == 1
+    assert any(log.get("outcome") == "cleanup_retry" for log in logs)

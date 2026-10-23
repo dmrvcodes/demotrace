@@ -1,14 +1,15 @@
 """Read duration, streams and start times with ffprobe, and enforce the 3-minute limit."""
 
 import json
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from demotrace_shared.errors import ErrorCode
 from demotrace_shared.limits import DURATION_TOLERANCE_S, MAX_DURATION_S
 
-from . import MediaError, ffprobe_bin
+from . import PROTOCOLS, MediaError, ffprobe_bin, run_tool
+
+PROBE_TIMEOUT_S = 30
 
 
 @dataclass(frozen=True)
@@ -34,10 +35,9 @@ def probe(path: Path) -> ProbeInfo:
 
     The browser checks the length too, but that check can be bypassed, so this is the real guard.
     """
-    result = subprocess.run(
-        [ffprobe_bin(), "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)],
-        capture_output=True,
-        text=True,
+    result = run_tool(
+        [ffprobe_bin(), *PROTOCOLS, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)],
+        cap_s=PROBE_TIMEOUT_S, what="ffprobe",
     )
     if result.returncode != 0:
         raise MediaError(ErrorCode.UNREADABLE_VIDEO, result.stderr.strip()[:300])
