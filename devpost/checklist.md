@@ -39,7 +39,7 @@ Build mode: fast
   Learner check: Run `analyze` on your video with 3–5 claims, one of which is only promised on a slide. Confirm that claim comes out Told only and that the timestamps point where you expect.
   Commit: `Add evidence map analysis with server-side validation and replay`
 
-- [ ] **4. A quality gate you can run: labelled videos scored against the plan's thresholds**
+- [x] **4. A quality gate you can run: labelled videos scored against the plan's thresholds**
   Becomes usable: `python eval/run.py` scores every labelled case and prints status accuracy, the share of false Shown on negative cases, and the evidence hit rate, with pass or fail against the early gate (3 videos, at least 70%, no false Shown on the promise slide).
   Why now: This is your evening gate. It decides whether the approach is good enough before any cloud or interface work is built on it.
   PRD ref: `prd.md > Product Decisions` (a slide that promises a feature is Told only), `prd.md > What We're Building`
@@ -89,7 +89,7 @@ Build mode: fast
   Learner check: On the deployed address, upload a video of yours, enter claims, wait, and click the evidence; then try with someone else's video.
   Commit: `Wire the interface to the live backend`
 
-- [ ] **9. You can come back to a result and re-check a new version**
+- [x] **9. You can come back to a result and re-check a new version**
   Becomes usable: Closing or reloading the tab keeps your claims and your analysis: a running analysis resumes, a finished one shows the saved report with "Drop the video file again to enable the interactive player". **Re-check with new video** returns to the upload step with the claims kept.
   Why now: This closes the loop from the scope — fix the weak part and check again — which the demo video is built on.
   PRD ref: `prd.md > Returning to a result`, `prd.md > Re-checking after a re-record`
@@ -137,12 +137,12 @@ Build mode: fast
 
 ## Final Review
 
-Agent verification, 24 October (commit `9682ee5`, Worker `sha256:bd0f0c0a…`): CI run 40029405841 green (verify and deploy; the plan held one in-place Worker update). The live site shows the TodoMVC sample labelled as a recorded analysis; clicking `[0:24]` moved the player to 24.0 s and highlighted C2. One live analysis through the public Control API (create → presigned POST → analyze → poll) reached `completed` in 109 s: 5/5 statuses, 4/4 evidence in range, 0/2 false Shown, request id logged, no S3 version left, the same job without its token answered 404. The learner's own kick-the-tires session has not happened yet. Found by the verification, for the learner to decide:
+Agent verification, 24 October (commit `b64e787`): CI/deploy run 40086717475 green. The live Worker has the new adaptive sampling and prompt rules. Four independent Lambda → Claude runs passed the gate: 4/4 recordings, 19/19 status matches, 100% evidence hits and 0/12 false Shown for claims expected not to be shown. The silent 0.7-second toast is now sampled at 9.5 s and correctly scored Shown; the partial create-and-share claim is correctly Told only. The production site answers with `LIVE ANALYSIS`. The learner's own kick-the-tires session has not happened yet. Remaining human checks:
 
-- [ ] The browser polls `GET /jobs/{id}` every 350 ms; the spec says 3 s. Several judges at once would mean several requests per second to the Control API for each of them — proposed: 2 s.
-- [ ] `prd.md > Returning to a result` (saved report and resume after closing the tab) is not built — build it or record it as deferred.
-- [ ] The eval gate needs three more recorded cases (being recorded); slice 4 stays open until `eval/run.py` passes.
-- [ ] Slice 10 live checks still to run: overwrite after `analyze`, the capacity switch at 0, the HEVC message, a reload mid-analysis.
+- [x] Polling is immediate once, then every 2 seconds; it does not issue overlapping requests after the screen changes.
+- [x] `prd.md > Returning to a result` is implemented: claims/job/report persist locally for seven days; completed reports request the original local video for interactive evidence playback.
+- [x] The four-recording eval gate passes from fresh live Lambda results.
+- [ ] Slice 10 human live checks still to run: overwrite after `analyze`, the capacity switch at 0, the HEVC message, a reload mid-analysis.
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map
@@ -164,6 +164,7 @@ Activity mode: not started; app map ready.
 - 24 October — ffmpeg/ffprobe run with timeouts derived from the Lambda's remaining time, `-t 180.5`, local files only and an environment without secrets; the video is deleted from S3 right after download — with reserved concurrency 2, two hanging files could otherwise block every analysis for 15 minutes.
 - 24 October — CI tests with the same pinned ffmpeg build as the Worker image, deploys from a native arm runner, trusts GitHub's immutable OIDC subject and refuses plans that delete or replace resources — a different ffmpeg in CI failed a test, the arm image could not build on amd64, and the role never matched the subject GitHub sends.
 - 24 October — "Try with sample" shows a recorded TodoMVC analysis instead of Big Buck Bunny — the sample is the first thing judges open, and it should show the product's real output.
+- 24 October — short recordings (up to 90 seconds) sample frames every 0.5 seconds, while longer recordings keep 1-second sampling; the 90-frame model cap remains. This caught a 0.7-second save toast that the old cadence missed. The gate now counts false Shown for every claim expected not to be shown, including Told only → Shown and Missing → Shown; the compound-claim prompt rule prevents a visible Share button from being mistaken for a completed share.
 
 - 23 October — Bedrock remained account-blocked, so the deployed Worker uses the authorized
   direct Anthropic API credential held in AWS Secrets Manager. The live Control API is a

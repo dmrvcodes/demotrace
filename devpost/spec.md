@@ -9,13 +9,13 @@ status: approved
 
 This section describes what is actually deployed and supersedes the planning sections below where they differ; those stay as the record of the original decisions. Each difference has its reason in `checklist.md > Revisions`.
 
-- **Interface** — Next.js on Vercel ([demotrace.vercel.app](https://demotrace.vercel.app)): Upload → Claims → Waiting → Results, drag and drop, a browser preflight (longer than 180.5 s is refused; HEVC without H.264 support is refused with a re-export hint), the timeline with colored markers and click-to-seek, and **Re-check with new video**, which keeps the claims. **Try with sample** plays a scripted TodoMVC demo with a recorded result from the deployed Worker, labelled as a recorded analysis. *Not built:* the saved report and resume after closing the tab (`prd.md > Returning to a result`); state lives only while the page is open.
+- **Interface** — Next.js on Vercel ([demotrace.vercel.app](https://demotrace.vercel.app)): Upload → Claims → Waiting → Results, drag and drop, a browser preflight (longer than 180.5 s is refused; HEVC without H.264 support is refused with a re-export hint), the timeline with colored markers and click-to-seek, and **Re-check with new video**, which keeps the claims. A 7-day localStorage record resumes polling after a reload and restores a finished report; the video itself is never persisted, so the author reattaches its local file to use evidence playback. **Try with sample** plays a scripted TodoMVC demo with a recorded result from the deployed Worker, labelled as a recorded analysis.
 - **Control API** — a dependency-free Python 3.12 handler on a Lambda Function URL, not FastAPI/Mangum; CORS is configured on the URL only. `POST /jobs` returns a job id, a 32-byte token (only its SHA-256 is stored) and a presigned **POST** for `incoming/{job_id}` (`video/mp4`, 1 byte–150 MB, 10 minutes). `POST /jobs/{id}/analyze` checks the upload, then one DynamoDB transaction reserves daily capacity (`MAX_DAILY_ANALYSES`, default 30) and moves `CREATED → QUEUED`, then invokes the Worker with `{job_id}` only; a failed invoke fails the job. `GET /jobs/{id}` fails a job that passed its deadline (`analysis_expired`). Job records expire after 7 days.
 - **Worker** — container image on arm64, 3008 MB, 2 GB `/tmp`, reserved concurrency 2, no retries, event age 900 s, 14-day logs, deployed **by digest**. ffmpeg 6.1.1 (`mwader/static-ffmpeg`, pinned by digest; CI tests with the same build) and whisper `small.en` are baked in. Stages: claim (`QUEUED → PROCESSING` with a `run_id`), download the pinned version, **delete every stored version right away**, frames, transcript, model, validation, save (conditional on `status` and `run_id`). Every ffmpeg/ffprobe run has a timeout derived from the time left, reads at most 180.5 s, local files only, with an environment that holds no secrets. Failures carry their stage and code; one JSON log line per job.
 - **Model** — `claude-sonnet-4-6` on the direct Anthropic API (key in Secrets Manager, passed to the client in memory), effort `high`, a strict JSON schema through `messages.create`; the stop reason is checked before the answer is validated; one retry on 429, 529 or another 5xx when time allows.
 - **Storage** — S3 versioned, encrypted, public access blocked, lifecycle 1 day for current and noncurrent versions; DynamoDB on demand with TTL.
 - **Infrastructure and CI** — everything is Terraform with encrypted, versioned S3 remote state and a lockfile. GitHub Actions: `verify` (pytest with the pinned ffmpeg, web lint and build, `terraform validate`); `deploy` on a native arm runner through a GitHub OIDC role scoped to this stack (immutable subject, production environment only). It builds and pushes the image, plans with the new digest, **refuses any plan that deletes or replaces a resource**, applies, then checks that the Worker runs the new digest and the Control API answers. The web app is deployed to Vercel from the CLI.
-- **Eval** — `eval/cases` (hand labels, no videos), `eval/score.py`, and `eval/run.py`, whose gate needs at least four recorded cases, 70% status accuracy and no false Shown on negative cases. First recorded case, `todomvc-01`: 5/5 statuses, 4/4 evidence in range, 0/2 false Shown.
+- **Eval** — `eval/cases` (hand labels, no videos), `eval/score.py`, and `eval/run.py`, whose gate needs at least four recorded cases, 70% status accuracy and no false Shown for any claim expected not to be shown. The 24 October live run covered four recordings / 19 claims: 100% status accuracy, 100% evidence hits and 0/12 false Shown.
 - **Measured** on `todomvc-01` (65 s, 1280×720, narrated): about 93 s from queue to result — transcription 47 s, frames 17.5 s, model 11 s; 1.7 GB peak memory; 16,367 input and 377 output tokens, about $0.055.
 
 ## How This Works, In Plain Language
@@ -26,7 +26,7 @@ DemoTrace has two halves: a website the author sees, and a small cloud backend t
 - **The front door** (a small Python service on AWS Lambda, "Control") does three things: it hands the browser a one-time upload slot, it starts an analysis when the author has typed their claims, and it reports progress and the final result. Every analysis gets a secret ticket (the job token) that only the author's browser holds, so nobody else can open the result.
 - **The video storage** (S3) receives the video straight from the browser through that one-time slot and keeps it only until the analysis is done.
 - **The notebook** (DynamoDB) holds one row per analysis: its claims, its status (created → waiting → analyzing → done or failed) and, at the end, the result. Moving between statuses is guarded so that two workers can never take the same job, and a finished job can never be overwritten by a late timeout.
-- **The analyst** (a second Lambda, "Worker", packaged as a container) does the real work in order: it checks the video length, cuts out frames (about one per second, plus scene changes, at most 90), writes down what is said (speech to text), and then asks Claude through the Anthropic API (the model is chosen in one place; today Claude Sonnet 4.6) one structured question: for each claim, is it Shown, Told only or Missing, which frames or speech segments prove it, and why. Then the Worker **checks that every piece of evidence Claude cites really exists** and computes all timestamps itself. It saves the result and deletes the video.
+- **The analyst** (a second Lambda, "Worker", packaged as a container) does the real work in order: it checks the video length, cuts out frames (one per second for longer clips; twice per second for clips up to 90 seconds, plus scene changes, at most 90 passed to the model), writes down what is said (speech to text), and then asks Claude through the Anthropic API (the model is chosen in one place; today Claude Sonnet 4.6) one structured question: for each claim, is it Shown, Told only or Missing, which frames or speech segments prove it, and why. Then the Worker **checks that every piece of evidence Claude cites really exists** and computes all timestamps itself. It saves the result and deletes the video.
 - **The browser's memory** (localStorage) keeps the claims, the ticket and the finished report on that device, so closing the tab does not lose anything. The video is not kept anywhere, so after a reload the author drops the file again to turn the player back on.
 
 Why this shape rather than something simpler: judges need to analyze a real video at any time during judging, so there has to be a real backend. Why not something more elaborate: no accounts, no queue service, no live sockets — the browser just asks for the status every few seconds, and the Worker's concurrency limit acts as a queue.
@@ -76,7 +76,7 @@ Fixture mode replays a recorded model response (`web/public/samples/sample.json`
 **Local pipeline, real model.**
 ```
 cd backend/worker
-python -m demotrace.cli analyze path/to/video.mp4 --claims claims.json --out out/        # real Bedrock call
+python -m demotrace.cli lambda-smoke path/to/video.mp4 --claims claims.json --profile demotrace-key
 python -m demotrace.cli analyze path/to/video.mp4 --claims claims.json --replay eval/fixtures/<case>.json   # no model call
 ```
 It needs `ffmpeg` and `ffprobe` on the path and AWS credentials in the learner's own AWS profile or environment — never in the repository.
@@ -123,7 +123,7 @@ PRD ref: `prd.md > Upload`, `prd.md > States and Boundaries`.
 PRD ref: `prd.md > Claims`.
 
 ### Waiting view and status poller
-Polls `GET /jobs/{id}` every 3 seconds with the job token. Maps `QUEUED` → "waiting to be processed", `PROCESSING` → "analyzing", `FAILED` → a message chosen from the error code (including the "demo is at capacity" banner that switches to the sample), `COMPLETED` → Results. Polling resumes after a page reload from the saved job id.
+Polls `GET /jobs/{id}` immediately and then every 2 seconds with the job token. Maps `QUEUED` → "waiting to be processed", `PROCESSING` → "analyzing", `FAILED` → a message chosen from the error code (including the "demo is at capacity" banner that switches to the sample), `COMPLETED` → Results. Polling resumes after a page reload from the saved job id.
 PRD ref: `prd.md > Waiting for the analysis`, `prd.md > States and Boundaries`.
 
 ### Results view
@@ -131,11 +131,11 @@ PRD ref: `prd.md > Waiting for the analysis`, `prd.md > States and Boundaries`.
 PRD ref: `prd.md > Results and evidence`, `prd.md > Re-checking after a re-record`.
 
 ### Saved report in the browser
-`store.ts` writes one record to localStorage (`demotrace:v1:last`): job id, job token, claims, status, result (when done), saved time. A new analysis replaces it. On load, a record with a result shows the saved report and the message "Drop the video file again to enable the interactive player"; a record without one resumes polling. The video itself is never stored. The sample is never stored.
+`saved-analysis.ts` writes one record to localStorage (`demotrace:last-analysis:v1`): job id, job token, claims, status, result (when done), saved time. A new analysis replaces it and entries expire after seven days. On load, a record with a result shows the saved report and the message "Reattach the original video to play evidence in the timeline"; a record without one resumes polling. The video itself is never stored. The sample is never stored.
 PRD ref: `prd.md > Returning to a result`.
 
 ### Sample mode and fixtures
-The local fixture mode loads `src/lib/sample.ts` and `/public/samples/demotrace-sample.mp4`, so the same Results view renders without an API call. Until Bedrock inference is enabled for this account, the sample result is a schema-checked local fixture with deliberately traceable frame evidence; it is labelled as a sample analysis. It is replaced with a recorded model response for the same sample video before the quality gate and public submission.
+The recorded sample loads `src/lib/sample.ts` and `/public/samples/todomvc-sample.mp4`, so the same Results view renders without an API call. It is a recorded Claude analysis of the same owned TodoMVC video and is labelled as a recorded analysis.
 PRD ref: `prd.md > Try with sample`.
 
 ### Control API (FastAPI)
