@@ -2,7 +2,7 @@ import pytest
 from PIL import Image
 
 from demotrace.media import dedupe
-from demotrace.media.frames import extract_candidates, frame_filter, parse_showinfo_times
+from demotrace.media.frames import candidate_step_s, extract_candidates, frame_filter, parse_showinfo_times
 from demotrace.media.probe import probe
 
 
@@ -18,6 +18,11 @@ def test_filter_never_upscales_and_keeps_aspect():
     assert "force_original_aspect_ratio=decrease" in vf
 
 
+def test_short_clips_sample_transient_ui_twice_per_second():
+    assert candidate_step_s(90.0) == 0.5
+    assert candidate_step_s(90.001) == 1.0
+
+
 def test_parses_showinfo_lines_only():
     stderr = (
         "[Parsed_showinfo_2 @ 0x1] n:   0 pts:      0 pts_time:0       duration:512\n"
@@ -27,12 +32,12 @@ def test_parses_showinfo_lines_only():
     assert parse_showinfo_times(stderr) == [0.0, 1.04]
 
 
-def test_about_one_frame_per_second(clips, tmp_path):
+def test_short_clip_samples_about_twice_per_second(clips, tmp_path):
     cands = extract_candidates(clips["moving"], probe(clips["moving"]), tmp_path)
     times = [c.t for c in cands]
     assert times[0] == 0.0
     assert times == sorted(times)
-    assert 6 <= len(cands) <= 9  # 1 per second over 6 s, plus the odd scene change
+    assert 11 <= len(cands) <= 15  # 2 per second over 6 s, plus the odd scene change
     assert all(b - a >= 0.03 for a, b in zip(times, times[1:]))
 
 

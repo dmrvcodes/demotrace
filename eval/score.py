@@ -1,8 +1,8 @@
 """Score one analysis result against a hand-labelled case (`spec.md > Eval harness`).
 
 Per claim: does the status match, and does a cited frame fall inside a labelled evidence range
-(tolerance = the frame sampling step)? Separately: false Shown on negative cases, which is the
-error that matters most for the kernel.
+(tolerance = the frame sampling step)? Separately: a false Shown for any claim expected not to
+be shown. This catches the high-impact Missing -> Shown and Told only -> Shown errors.
 
     python eval/score.py eval/cases/todomvc-01.json eval/runs/todomvc-01.result.json
 """
@@ -33,20 +33,20 @@ def score(case: dict, result: dict, tolerance: float = DEFAULT_TOLERANCE_S) -> d
             "got": answer.get("status"),
             "status_ok": answer.get("status") == label["expected"],
             "negative": label["negative"],
-            "false_shown": bool(label["negative"]) and answer.get("status") == "shown",
+            "false_shown": label["expected"] != "shown" and answer.get("status") == "shown",
             # Shown is judged on frames; Told only may rest on a slide frame or a speech segment.
             "evidence_hit": (None if not ranges else
                              _hit(frame_times if label["expected"] == "shown" else any_times, ranges, tolerance)),
             "cited": [f"{e['ref_id']}@{e['t']:.1f}" for e in evidence],
         })
     hits = [r["evidence_hit"] for r in rows if r["evidence_hit"] is not None]
-    negatives = [r for r in rows if r["negative"]]
+    non_shown = [r for r in rows if r["expected"] != "shown"]
     return {
         "case_id": case["case_id"],
         "status_accuracy": sum(r["status_ok"] for r in rows) / len(rows),
         "evidence_hit_rate": (sum(hits) / len(hits)) if hits else None,
-        "false_shown_on_negatives": sum(r["false_shown"] for r in negatives),
-        "negatives": len(negatives),
+        "false_shown_on_non_shown": sum(r["false_shown"] for r in non_shown),
+        "non_shown": len(non_shown),
         "rows": rows,
     }
 
@@ -54,7 +54,7 @@ def score(case: dict, result: dict, tolerance: float = DEFAULT_TOLERANCE_S) -> d
 def report(scored: dict) -> str:
     lines = [f"{scored['case_id']}: status {scored['status_accuracy']:.0%}, evidence hits "
              + (f"{scored['evidence_hit_rate']:.0%}" if scored["evidence_hit_rate"] is not None else "-")
-             + f", false Shown on negatives {scored['false_shown_on_negatives']}/{scored['negatives']}"]
+             + f", false Shown on claims expected not shown {scored['false_shown_on_non_shown']}/{scored['non_shown']}"]
     for r in scored["rows"]:
         mark = "ok " if r["status_ok"] else "MISS"
         hit = {True: "in range", False: "OUT of range", None: "-"}[r["evidence_hit"]]

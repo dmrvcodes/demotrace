@@ -6,28 +6,54 @@ import { ResultsView } from "@/components/results-view";
 import { UploadView } from "@/components/upload-view";
 import { WaitingView } from "@/components/waiting-view";
 import { createJob, getJob, startAnalysis, uploadVideo, type JobStatus } from "@/lib/api";
+import { loadSavedAnalysis, saveAnalysis } from "@/lib/saved-analysis";
 import { SAMPLE_VIDEO, sampleAnalysis } from "@/lib/sample";
 
 export default function Home() {
   const isLive = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
-  const [screen, setScreen] = useState<"upload" | "claims" | "waiting" | "results">("upload");
+  const [restored] = useState(() => loadSavedAnalysis());
+  const restoredCompleted = restored?.job.status === "completed" && Boolean(restored.result);
+  const restoredWaiting = restored?.job.status === "queued" || restored?.job.status === "processing";
+  const [screen, setScreen] = useState<"upload" | "claims" | "waiting" | "results">(
+    restoredCompleted ? "results" : restoredWaiting ? "waiting" : "upload",
+  );
   const [activeClaimId, setActiveClaimId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [videoSrc, setVideoSrc] = useState(SAMPLE_VIDEO);
-  const [claims, setClaims] = useState(["", "", ""]);
+  const [videoSrc, setVideoSrc] = useState(restoredCompleted ? "" : SAMPLE_VIDEO);
+  const [claims, setClaims] = useState(restored?.claims ?? ["", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [job, setJob] = useState<{ id: string; token: string; status: JobStatus } | null>(null);
-  const [result, setResult] = useState(sampleAnalysis);
-  const [isSample, setIsSample] = useState(true);
+  const [job, setJob] = useState<{ id: string; token: string; status: JobStatus } | null>(
+    restoredWaiting || restoredCompleted ? restored!.job : null,
+  );
+  const [result, setResult] = useState(restored?.result ?? sampleAnalysis);
+  const [isSample, setIsSample] = useState(!restored);
+  const [attachSavedVideo, setAttachSavedVideo] = useState(false);
 
   useEffect(() => () => { if (videoSrc.startsWith("blob:")) URL.revokeObjectURL(videoSrc); }, [videoSrc]);
   useEffect(() => {
+    if (isSample || !job || job.status === "failed") return;
+    saveAnalysis({ savedAt: Date.now(), claims, job, result: job.status === "completed" ? result : undefined });
+  }, [claims, isSample, job, result]);
+  useEffect(() => {
     if (screen !== "waiting" || !job) return;
-    const poll = window.setInterval(async () => { try { const next = await getJob(job.id, job.token); setJob((current) => current ? { ...current, status: next.status } : current); if (next.status === "completed" && next.result) { setResult(next.result); setScreen("results"); } if (next.status === "failed") { setError(next.error_message ?? "Analysis failed"); setScreen("claims"); } } catch (pollError) { setError(pollError instanceof Error ? pollError.message : "Polling failed"); setScreen("claims"); } }, 350);
-    return () => window.clearInterval(poll);
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const next = await getJob(job.id, job.token);
+        if (cancelled) return;
+        setJob((current) => current ? { ...current, status: next.status } : current);
+        if (next.status === "completed" && next.result) { setResult(next.result); setScreen("results"); }
+        if (next.status === "failed") { setError(next.error_message ?? "Analysis failed"); setScreen("claims"); }
+      } catch (pollError) {
+        if (!cancelled) { setError(pollError instanceof Error ? pollError.message : "Polling failed"); setScreen("claims"); }
+      }
+    };
+    void poll();
+    const pollId = window.setInterval(() => { void poll(); }, 2_000);
+    return () => { cancelled = true; window.clearInterval(pollId); };
   }, [job, screen]);
 
   const selectFile = async (selected: File) => {
@@ -43,7 +69,12 @@ export default function Home() {
       const hevc = await navigator.mediaCapabilities?.decodingInfo?.({ type: "file", video: { contentType: "video/mp4; codecs=hvc1.1.6.L93.B0", width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 } }).catch(() => undefined);
       if (probe.duration > 180.5) { URL.revokeObjectURL(url); return setError("Video is longer than 3 minutes."); }
       if (hevc?.supported && !h264?.supported) { URL.revokeObjectURL(url); return setError("This looks like HEVC. Re-export as H.264 MP4 before uploading."); }
-      setFile(selected); setVideoSrc(url); setIsSample(false); setScreen("claims");
+      setFile(selected); setVideoSrc(url); setIsSample(false);
+      if (attachSavedVideo) {
+        setAttachSavedVideo(false); setScreen("results");
+      } else {
+        setScreen("claims");
+      }
     };
     probe.onerror = () => { URL.revokeObjectURL(url); setError("Video metadata could not be read. Re-export as H.264 MP4."); };
   };
@@ -65,10 +96,10 @@ export default function Home() {
           <span className="wordmark__mark">D</span>
           <span>DemoTrace</span>
         </button>
-        <span className="environment-label">{isLive ? "LIVE ANALYSIS" : "LOCAL FIXTURE MODE"}</span>
+        <span className="environment-label">{isLive ? "LIVE ANALYSIS" : "LOCAL DEVELOPMENT"}</span>
       </header>
       <main>
-        {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc(SAMPLE_VIDEO); setIsSample(true); setScreen("results"); }} />}
+        {screen === "upload" && <UploadView error={error} fileName={file?.name ?? null} onFileSelected={selectFile} onTrySample={() => { setResult(sampleAnalysis); setVideoSrc(SAMPLE_VIDEO); setIsSample(true); setAttachSavedVideo(false); setScreen("results"); }} />}
         {screen === "claims" && <ClaimsView busy={busy} claims={claims} error={error} onChange={setClaims} onStart={runLiveAnalysis} />}
         {screen === "waiting" && <WaitingView status={job?.status === "processing" ? "processing" : "queued"} />}
         {screen === "results" && (
@@ -77,7 +108,8 @@ export default function Home() {
             currentTime={currentTime}
             onEvidenceClick={seekToEvidence}
             onTimeUpdate={setCurrentTime}
-            onRecheck={() => setScreen("upload")}
+            onRecheck={() => { setAttachSavedVideo(false); setScreen("upload"); }}
+            onAttachSavedVideo={() => { setAttachSavedVideo(true); setScreen("upload"); }}
             result={result}
             isSample={isSample}
             videoRef={videoRef}

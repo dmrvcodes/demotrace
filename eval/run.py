@@ -6,7 +6,7 @@ after each live Lambda analysis:
     .venv/bin/python eval/run.py
 
 The default is deliberately strict: it refuses to claim a gate from fewer than four recorded,
-hand-labelled cases and fails on any false ``shown`` in a negative case.
+hand-labelled cases and fails on any false ``shown`` for a claim expected not to be shown.
 """
 
 from __future__ import annotations
@@ -37,14 +37,14 @@ def run(cases_dir: Path, runs_dir: Path) -> tuple[list[dict], list[str]]:
 def aggregate(scored: list[dict], missing: list[str]) -> dict:
     rows = [row for item in scored for row in item["rows"]]
     evidence_rows = [row for row in rows if row["evidence_hit"] is not None]
-    negatives = [row for row in rows if row["negative"]]
+    non_shown = [row for row in rows if row["expected"] != "shown"]
     return {
         "cases_recorded": len(scored),
         "cases_missing_results": missing,
         "status_accuracy": sum(row["status_ok"] for row in rows) / len(rows) if rows else 0,
         "evidence_hit_rate": sum(row["evidence_hit"] for row in evidence_rows) / len(evidence_rows) if evidence_rows else None,
-        "false_shown_on_negatives": sum(row["false_shown"] for row in negatives),
-        "negatives": len(negatives),
+        "false_shown_on_non_shown": sum(row["false_shown"] for row in non_shown),
+        "non_shown": len(non_shown),
     }
 
 
@@ -53,7 +53,7 @@ def passed(summary: dict) -> bool:
         summary["cases_recorded"] >= MIN_CASES
         and not summary["cases_missing_results"]
         and summary["status_accuracy"] >= MIN_STATUS_ACCURACY
-        and summary["false_shown_on_negatives"] == 0
+        and summary["false_shown_on_non_shown"] == 0
     )
 
 
@@ -67,7 +67,7 @@ def main() -> int:
         print(report(item))
     summary = aggregate(scored, missing)
     evidence = "-" if summary["evidence_hit_rate"] is None else f"{summary['evidence_hit_rate']:.0%}"
-    print(f"\nGate: {summary['cases_recorded']}/{MIN_CASES} recorded cases; status {summary['status_accuracy']:.0%}; evidence {evidence}; false Shown {summary['false_shown_on_negatives']}/{summary['negatives']}")
+    print(f"\nGate: {summary['cases_recorded']}/{MIN_CASES} recorded cases; status {summary['status_accuracy']:.0%}; evidence {evidence}; false Shown {summary['false_shown_on_non_shown']}/{summary['non_shown']}")
     if missing:
         print(f"Missing live runs: {', '.join(missing)}")
     if passed(summary):

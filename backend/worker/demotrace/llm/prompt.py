@@ -52,6 +52,10 @@ however convincing it looks. Only the working product producing the claimed resu
 - An interface that looks similar but does not display the claimed result is not "shown".
 - Hovering, focusing, opening a menu or moving a cursor is not "shown" unless the claimed result
   itself becomes visibly true in the product interface.
+- A compound claim is "shown" only when every material outcome in it is visibly demonstrated.
+  For example, creating a dashboard does not prove that it was shared; a visible Share button
+  does not prove sharing. If only part of a compound claim is demonstrated, classify the full
+  claim as told_only when it is stated, otherwise missing, and explain the unproven part.
 - Do not infer a result from an event that may have happened between sampled frames. If the
   observable result is not present in a cited frame, use told_only or missing as appropriate.
 - If nothing changes on screen across the frames, say so; such claims can only be told_only or missing.

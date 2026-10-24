@@ -14,6 +14,8 @@ SCENE_THRESHOLD = 0.3
 FRAMES_TIMEOUT_S = 180
 MAX_READ_S = MAX_DURATION_S + DURATION_TOLERANCE_S  # 180.5
 CANDIDATE_JPEG_QSCALE = 3  # ffmpeg's -q:v scale, 2 (best) to 31 (worst)
+TRANSIENT_UI_MAX_DURATION_S = 90.0
+TRANSIENT_UI_STEP_S = 0.5
 
 _PTS_TIME = re.compile(r"\bpts_time:\s*(-?\d+(?:\.\d+)?(?:e-?\d+)?)")
 
@@ -34,6 +36,16 @@ def frame_filter(step_s: float = FRAME_SAMPLING_STEP_S, max_side: int = FRAME_MA
     return ",".join([scale, select, "showinfo"])
 
 
+def candidate_step_s(duration_s: float) -> float:
+    """Sample short clips twice per second so short-lived UI feedback is observable.
+
+    The frame budget still caps what reaches the model.  Long videos retain the documented
+    one-frame-per-second cadence, while a <= 90 s proof-of-concept clip can capture a toast
+    that appears wholly between two one-second samples.
+    """
+    return TRANSIENT_UI_STEP_S if duration_s <= TRANSIENT_UI_MAX_DURATION_S else FRAME_SAMPLING_STEP_S
+
+
 def parse_showinfo_times(stderr: str) -> list[float]:
     return [
         float(match.group(1))
@@ -42,15 +54,16 @@ def parse_showinfo_times(stderr: str) -> list[float]:
     ]
 
 
-def extract_candidates(video: Path, info: ProbeInfo, out_dir: Path) -> list[Candidate]:
+def extract_candidates(video: Path, info: ProbeInfo, out_dir: Path, *, step_s: float | None = None) -> list[Candidate]:
     out_dir.mkdir(parents=True, exist_ok=True)
+    sampling_step_s = candidate_step_s(info.duration_s) if step_s is None else step_s
     result = run_tool(
         [
             ffmpeg_bin(), "-hide_banner", "-nostdin", "-loglevel", "info", *PROTOCOLS,
             "-i", str(video),
             "-t", str(MAX_READ_S),  # never read past the length limit, whatever the container claims
             "-map", "0:v:0",
-            "-vf", frame_filter(),
+            "-vf", frame_filter(sampling_step_s),
             "-fps_mode", "vfr",
             "-q:v", str(CANDIDATE_JPEG_QSCALE),
             str(out_dir / "cand_%05d.jpg"),

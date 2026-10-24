@@ -7,11 +7,11 @@ from pathlib import Path
 from PIL import Image
 
 from demotrace_shared.errors import ErrorCode
-from demotrace_shared.limits import FRAME_SAMPLING_STEP_S, MAX_FRAMES, REQUEST_MAX_BYTES
+from demotrace_shared.limits import MAX_FRAMES, REQUEST_MAX_BYTES
 from demotrace_shared.media import Frame, PreparedMedia
 
 from .media import MediaError, budget, dedupe
-from .media.frames import extract_candidates
+from .media.frames import candidate_step_s, extract_candidates
 from .media.probe import probe
 from .stages import StageTracker, stage_of
 from .stt import transcribe as stt
@@ -79,7 +79,7 @@ def _prepare(video: Path, out_dir: Path, with_speech: bool, whisper_model: str |
         video_codec=info.video_codec,
         frames=frames,
         segments=segments,
-        sampling_step_s=FRAME_SAMPLING_STEP_S,
+        sampling_step_s=candidate_step_s(info.duration_s),
         candidates=len(candidates),
         jpeg_quality=fitted.quality,
         dropped_for_size=fitted.dropped,
