@@ -16,7 +16,8 @@ type ApiAnalysisResult = Omit<AnalysisResult, "claims"> & {
 
 type CreatedJob = { job_id: string; job_token: string; upload_url: string; upload_fields?: Record<string, string> };
 
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+// A trailing slash in the configured base would produce `//jobs`, which the Function URL rejects.
+const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, init);
