@@ -8,6 +8,7 @@ import { WaitingView } from "@/components/waiting-view";
 import { createJob, getJob, startAnalysis, uploadVideo, type JobStatus } from "@/lib/api";
 import { loadSavedAnalysis, saveAnalysis } from "@/lib/saved-analysis";
 import { SAMPLE_VIDEO, sampleAnalysis } from "@/lib/sample";
+import { isHevcMp4 } from "@/lib/video-codec";
 
 export default function Home() {
   const isLive = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
@@ -60,15 +61,13 @@ export default function Home() {
     setError(null);
     if (selected.size > 150 * 1024 * 1024) return setError("Video exceeds 150 MB.");
     if (selected.type && selected.type !== "video/mp4") return setError("Use an H.264 MP4 video.");
+    if (await isHevcMp4(selected)) return setError("This looks like HEVC. Re-export as H.264 MP4 before uploading.");
     const url = URL.createObjectURL(selected);
     const probe = document.createElement("video");
     probe.preload = "metadata";
     probe.src = url;
-    probe.onloadedmetadata = async () => {
-      const h264 = await navigator.mediaCapabilities?.decodingInfo?.({ type: "file", video: { contentType: "video/mp4; codecs=avc1.42E01E", width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 } }).catch(() => undefined);
-      const hevc = await navigator.mediaCapabilities?.decodingInfo?.({ type: "file", video: { contentType: "video/mp4; codecs=hvc1.1.6.L93.B0", width: 1920, height: 1080, bitrate: 5_000_000, framerate: 30 } }).catch(() => undefined);
+    probe.onloadedmetadata = () => {
       if (probe.duration > 180.5) { URL.revokeObjectURL(url); return setError("Video is longer than 3 minutes."); }
-      if (hevc?.supported && !h264?.supported) { URL.revokeObjectURL(url); return setError("This looks like HEVC. Re-export as H.264 MP4 before uploading."); }
       setFile(selected); setVideoSrc(url); setIsSample(false);
       if (attachSavedVideo) {
         setAttachSavedVideo(false); setScreen("results");

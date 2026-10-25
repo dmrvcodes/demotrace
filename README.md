@@ -70,6 +70,17 @@ is made before that gate passes.
 - GitHub Actions uses a scoped OIDC deploy role and immutable action references. That role cannot
   mutate IAM execution policies.
 
+The production-only safety check uses two owned local MP4s and one real model call. It verifies
+unauthenticated report access, pinned S3 versions despite an overwrite, S3 cleanup, log privacy,
+and the temporary capacity off switch. It restores the Lambda configuration even on failure; do
+not run it during a public demo because it sets capacity to zero briefly.
+
+```bash
+AWS_PROFILE=demotrace-key .venv/bin/python scripts/live_system_check.py \
+  --video .local/eval/videos/todomvc-01.mp4 \
+  --replacement .local/eval/videos/silent-missing-01.mp4
+```
+
 ## Attribution
 
 The **Try with sample** video is a scripted recording of the
