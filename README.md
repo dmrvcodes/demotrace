@@ -57,9 +57,10 @@ local by design. Run the honest quality gate with:
 ```
 
 It requires four recorded, hand-labelled cases, status accuracy of at least 70%, and **zero false
-Shown verdicts on negative cases**. The repository currently contains one real labelled run; the
-gate intentionally fails until the remaining three cases are recorded. No aggregate quality claim
-is made before that gate passes.
+Shown verdicts on negative cases**. The current 24 October smoke eval has four live Lambda → Claude
+recordings (19 claims): **100% status accuracy, 100% evidence hits and 0/12 false Shown**. This is
+a small, hand-labelled smoke eval—not a general accuracy claim—and raw videos and responses remain
+out of Git.
 
 ## Security and operations
 

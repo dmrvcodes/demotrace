@@ -142,7 +142,8 @@ Agent verification, 24 October (commit `b64e787`): CI/deploy run 40086717475 gre
 - [x] Polling is immediate once, then every 2 seconds; it does not issue overlapping requests after the screen changes.
 - [x] `prd.md > Returning to a result` is implemented: claims/job/report persist locally for seven days; completed reports request the original local video for interactive evidence playback.
 - [x] The four-recording eval gate passes from fresh live Lambda results.
-- [ ] Slice 10 human live checks still to run: overwrite after `analyze`, the capacity switch at 0, the HEVC message, a reload mid-analysis.
+- [x] 25 October agent production check: unauthenticated read returned 404; an original S3 version remained pinned despite an overwrite; the Worker completed from that version and left no S3 versions; Worker logs contained no private markers; capacity 0 returned the public 429, then `MAX_DAILY_ANALYSES` restored exactly to 30. The diagnostic is [`scripts/live_system_check.py`](../scripts/live_system_check.py), which cleans up and restores in `finally`.
+- [ ] Remaining Slice 10 browser checks: select the HEVC test file and confirm the re-export message; reload while a live job is processing, then reopen the completed report, reattach its source video and click evidence. (The automation extension needs its local-file access enabled before it can select the generated HEVC test file.)
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map
