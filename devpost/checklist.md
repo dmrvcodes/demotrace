@@ -153,7 +153,7 @@ Agent verification, 24 October (commit `b64e787`): CI/deploy run 40086717475 gre
 - [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
 - [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: the app map was generated from commit `9682ee5` and checked in a browser; every path and symbol in it was checked against the source. The learning activity itself is offered but not done yet: the proposed focused alternative is tracing how the deploy failure was diagnosed (CloudTrail showed GitHub's immutable OIDC subject, `infra/main.tf > github_deploy_subjects`).
+Activity and evidence: the app map was refreshed from commit `07bd8e7` and checked against the source; every path and symbol in it was checked. The learning activity itself is offered but not done yet: the proposed focused alternative is tracing how the deploy failure was diagnosed (CloudTrail showed GitHub's immutable OIDC subject, `infra/main.tf > github_deploy_subjects`).
 Route and stops: reference route only — `web/src/app/page.tsx > runLiveAnalysis`, `backend/worker/demotrace/handler.py > handler`, `backend/worker/demotrace/validate.py > assemble_result`.
 Edit outcome: not applicable yet.
 Reflection: not offered yet.

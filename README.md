@@ -91,3 +91,10 @@ a real, recorded result from the deployed Worker (`claude-sonnet-4-6`), labelled
 a recorded analysis rather than a live one.
 
 Built with the Devpost Learn Skill Pack for **Build With AI: Basics**.
+
+## Demo capture
+
+The owner-facing, shot-by-shot capture plan for the submission video is
+[`devpost/demo-run-sheet.md`](devpost/demo-run-sheet.md). It uses two genuine
+production runs to show the core improvement loop: **Told only** in a weak
+recording, then **Shown** after the demonstrable action is added.

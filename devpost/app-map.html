@@ -41,7 +41,7 @@
 <body>
 <main>
   <h1>DemoTrace — app map</h1>
-  <p class="muted">A take-home guide to the code. Snapshot of commit <code>b64e787</code> (24 October 2026); the code can drift after this, so trust the source over this page.</p>
+  <p class="muted">A take-home guide to the code. Snapshot of commit <code>07bd8e7</code> (25 October 2026); the code can drift after this, so trust the source over this page.</p>
 
   <h2>What it is, in one paragraph</h2>
   <p>You upload a demo video (up to 3 minutes) and 3–5 claims. A Worker on AWS Lambda takes frames and a transcript, asks Claude one structured question per claim — <strong>Shown</strong>, <strong>Told only</strong> or <strong>Missing</strong>, and which frames or speech segments prove it — then checks that every cited piece of evidence really exists and computes the timestamps itself. The browser shows the video next to one card per claim; a click on a timestamp jumps to that second. The video is deleted from S3 right after download.</p>
@@ -124,7 +124,7 @@
 
   <h2>A practice to reuse</h2>
   <div class="card">
-    <p><strong>Write the observable result down first, then score the system against it.</strong> The PRD said a slide that promises a feature is never Shown. That became hand-labelled negative cases — including a hovered button, a screenshot embedded in a slide, a partial create-and-share claim and a silent caption — and a scorer, <code>eval/score.py</code>, that reports any false Shown separately. The 24 October live run scored 19/19 statuses, 100% evidence hits and 0/12 false Shown across four recordings; <code>eval/run.py</code> refuses to claim a quality gate from fewer than four such cases.</p>
+    <p><strong>Write the observable result down first, then score the system against it.</strong> The PRD said a slide that promises a feature is never Shown. That became hand-labelled negative cases — including a hovered button, a screenshot embedded in a slide, a partial create-and-share claim and a silent caption — and a scorer, <code>eval/score.py</code>, that reports any false Shown separately. The 25 October live run scored 27/27 statuses, 100% evidence hits and 0/16 false Shown across six recordings; <code>eval/run.py --min-cases 6</code> refuses to claim this gate from fewer than six cases.</p>
     <p class="muted">On another project: turn the one rule your product must never break into a labelled example with a negative case, before you tune anything, so "it looks right" becomes a number you can rerun.</p>
   </div>
 

@@ -5,7 +5,7 @@ status: approved
 
 # DemoTrace — Technical Spec
 
-## As Built (24 October, feature freeze)
+## As Built (26 October, submission freeze)
 
 This section describes what is actually deployed and supersedes the planning sections below where they differ; those stay as the record of the original decisions. Each difference has its reason in `checklist.md > Revisions`.
 
