@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "case_id": "board-02",
+  "video": ".local/eval/videos/board-02.mp4",
+  "duration_s": 28.0,
+  "source": "Scripted headless recording of the local Planly Kanban mock, narration by Amazon Polly neural voice Arthur (en-GB)",
+  "speech_ranges_s": [[0.3, 2.7], [3.8, 5.8], [10.8, 13.4], [18.3, 21.6], [25.4, 26.7]],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "Moving the landing-page task to In review updates its column.",
+      "expected": "shown",
+      "evidence_ranges_s": [[5.5, 11.0]],
+      "negative": null,
+      "note": "The Move to In review action completes at 5.9; Design landing page visibly moves from Todo to In review and the counts change from 2/1 to 1/2."
+    },
+    {
+      "id": "C2",
+      "text": "Clicking New task adds a card to Todo.",
+      "expected": "shown",
+      "evidence_ranges_s": [[12.5, 18.3]],
+      "negative": null,
+      "note": "The New task action completes at 12.9; Confirm launch checklist appears in Todo and its count returns from 1 to 2."
+    },
+    {
+      "id": "C3",
+      "text": "Stakeholders receive a weekly email digest every Monday.",
+      "expected": "told_only",
+      "evidence_ranges_s": [[18.3, 25.0]],
+      "negative": "coming_soon_caption",
+      "note": "Narration and an explicitly Coming soon caption promise the digest; no digest is generated or sent."
+    },
+    {
+      "id": "C4",
+      "text": "Users can export the board to CSV.",
+      "expected": "missing",
+      "evidence_ranges_s": [],
+      "negative": "absent_feature",
+      "note": "Export is never shown or mentioned."
+    }
+  ]
+}

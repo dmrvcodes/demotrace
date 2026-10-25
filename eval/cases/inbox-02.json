@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "case_id": "inbox-02",
+  "video": ".local/eval/videos/inbox-02.mp4",
+  "duration_s": 29.0,
+  "source": "Scripted headless recording of the local Relay shared-inbox mock, narration by Amazon Polly neural voice Arthur (en-GB)",
+  "speech_ranges_s": [[0.3, 3.0], [3.2, 5.6], [10.8, 12.9], [18.8, 21.8], [26.4, 27.8]],
+  "claims": [
+    {
+      "id": "C1",
+      "text": "Archiving the selected launch-plan message removes it from Inbox.",
+      "expected": "shown",
+      "evidence_ranges_s": [[6.0, 11.0]],
+      "negative": null,
+      "note": "Archive selected completes at 6.4; the Launch plan review is gone, Inbox changes 3 to 2 and Archive changes 4 to 5."
+    },
+    {
+      "id": "C2",
+      "text": "Search filters the inbox as you type.",
+      "expected": "shown",
+      "evidence_ranges_s": [[13.4, 18.8]],
+      "negative": null,
+      "note": "Typing invoice completes at 13.6 and leaves only the Cloud host October invoice message visible."
+    },
+    {
+      "id": "C3",
+      "text": "Messages can be scheduled for delivery later.",
+      "expected": "told_only",
+      "evidence_ranges_s": [[18.8, 26.0]],
+      "negative": "coming_soon_caption",
+      "note": "Narration and a Coming soon scheduled-delivery caption promise the feature; no compose or scheduling workflow is demonstrated."
+    },
+    {
+      "id": "C4",
+      "text": "Relay supports single sign-on.",
+      "expected": "missing",
+      "evidence_ranges_s": [],
+      "negative": "absent_feature",
+      "note": "Single sign-on is never shown or mentioned."
+    }
+  ]
+}

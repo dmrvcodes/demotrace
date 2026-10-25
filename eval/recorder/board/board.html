@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Planly</title>
+    <style>
+      * { box-sizing: border-box; } body { margin: 0; min-height: 100vh; background: #0d1117; color: #e6edf3; font: 17px Inter, Arial, sans-serif; }
+      header { height: 86px; display: flex; align-items: center; justify-content: space-between; padding: 0 64px; border-bottom: 1px solid #30363d; }
+      h1 { margin: 0; font-size: 27px; } header p { color: #8b949e; margin: 5px 0 0; } button { border: 0; border-radius: 8px; color: #fff; cursor: pointer; font: inherit; padding: 12px 16px; background: #238636; }
+      main { padding: 50px 64px; } .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; } .column { min-height: 470px; padding: 18px; background: #161b22; border: 1px solid #30363d; border-radius: 12px; }
+      .column h2 { margin: 0 0 18px; font-size: 18px; color: #c9d1d9; } .count { color: #8b949e; font-size: 14px; } .card { background: #21262d; border: 1px solid #30363d; border-radius: 9px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 0 #010409; }
+      .card strong { display: block; margin-bottom: 9px; } .tag { display: inline-block; color: #a5d6ff; background: #033d8b; border-radius: 999px; padding: 4px 8px; font-size: 13px; } .move { margin-top: 14px; padding: 8px 10px; font-size: 14px; background: #1f6feb; }
+      #future { position: fixed; display: none; right: 52px; bottom: 48px; width: 395px; padding: 22px; border: 1px solid #d29922; border-radius: 10px; background: #2d2208; color: #f2cc60; } #future b { display: block; margin-bottom: 7px; color: #ffd33d; }
+    </style>
+  </head>
+  <body>
+    <header><div><h1>Planly</h1><p>Product launch · 6 tasks</p></div><button id="new-task">+ New task</button></header>
+    <main><div class="board">
+      <section class="column"><h2>Todo <span class="count" id="todo-count">2</span></h2><div id="todo"><article class="card" id="landing"><strong>Design landing page</strong><span class="tag">Marketing</span><button class="move" id="move">Move to In review</button></article><article class="card"><strong>Prepare launch FAQ</strong><span class="tag">Docs</span></article></div></section>
+      <section class="column"><h2>In review <span class="count" id="review-count">1</span></h2><div id="review"><article class="card"><strong>Pricing review</strong><span class="tag">Finance</span></article></div></section>
+      <section class="column"><h2>Done <span class="count">3</span></h2><div><article class="card"><strong>Set up analytics</strong><span class="tag">Growth</span></article></div></section>
+    </div></main>
+    <aside id="future"><b>Coming soon: weekly email digests</b>Stakeholders will receive a summary every Monday.</aside>
+    <script>
+      document.querySelector('#move').addEventListener('click', () => { document.querySelector('#review').append(document.querySelector('#landing')); document.querySelector('#move').remove(); document.querySelector('#todo-count').textContent = '1'; document.querySelector('#review-count').textContent = '2'; });
+      document.querySelector('#new-task').addEventListener('click', () => { const card = document.createElement('article'); card.className = 'card'; card.innerHTML = '<strong>Confirm launch checklist</strong><span class="tag">Launch</span>'; document.querySelector('#todo').append(card); document.querySelector('#todo-count').textContent = '2'; });
+      window.showDigest = (visible) => { document.querySelector('#future').style.display = visible ? 'block' : 'none'; };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Relay Inbox</title>
+    <style>
+      * { box-sizing: border-box; } body { margin: 0; min-height: 100vh; background: #f8fafc; color: #172033; font: 17px Inter, Arial, sans-serif; } header { height: 82px; padding: 0 64px; display: flex; gap: 34px; align-items: center; background: #fff; border-bottom: 1px solid #dce3ee; } h1 { margin: 0; color: #315ee8; font-size: 27px; } input { flex: 1; max-width: 520px; border: 1px solid #c9d4e6; border-radius: 9px; font: inherit; padding: 12px 14px; } main { display: grid; grid-template-columns: 250px 1fr; min-height: calc(100vh - 82px); } nav { background: #fff; padding: 38px 28px; border-right: 1px solid #dce3ee; } nav p { padding: 12px; margin: 5px 0; border-radius: 8px; } nav .selected { background: #e8efff; color: #315ee8; font-weight: 700; } .badge { float: right; background: #e5e7eb; border-radius: 999px; padding: 2px 8px; font-size: 13px; } section { padding: 42px 60px; } h2 { margin-top: 0; } .toolbar { margin-bottom: 20px; } button { border: 0; border-radius: 8px; padding: 10px 14px; background: #315ee8; color: #fff; cursor: pointer; font: inherit; } .message { display: grid; grid-template-columns: 28px 190px 1fr; gap: 15px; align-items: center; padding: 19px; background: #fff; border: 1px solid #dce3ee; border-bottom: 0; } .message:last-child { border-bottom: 1px solid #dce3ee; border-radius: 0 0 9px 9px; } .message:first-of-type { border-radius: 9px 9px 0 0; } .sender { font-weight: 700; } #future { position: fixed; display: none; right: 52px; bottom: 48px; width: 400px; border: 1px solid #b9a7ff; border-radius: 10px; background: #f0edff; padding: 20px; color: #4b3f91; } #future b { display: block; margin-bottom: 7px; }
+    </style>
+  </head>
+  <body>
+    <header><h1>Relay</h1><input id="search" aria-label="Search inbox" placeholder="Search mail"></header>
+    <main><nav><p class="selected">Inbox <span class="badge" id="inbox-count">3</span></p><p>Archive <span class="badge" id="archive-count">4</span></p><p>Starred</p></nav><section><h2>Inbox</h2><div class="toolbar"><button id="archive">Archive selected</button></div><div id="messages"><article class="message" id="launch"><input type="checkbox" aria-label="Select Launch plan"><span class="sender">Maya Chen</span><span>Launch plan review is ready</span></article><article class="message"><input type="checkbox" aria-label="Select Design review"><span class="sender">Design team</span><span>Updated handoff files</span></article><article class="message"><input type="checkbox" aria-label="Select Invoice"><span class="sender">Cloud host</span><span>Your October invoice</span></article></div></section></main>
+    <aside id="future"><b>Coming soon: scheduled delivery</b>Write a message now and choose a later send time.</aside>
+    <script>
+      const messages = document.querySelector('#messages');
+      document.querySelector('#archive').addEventListener('click', () => { const selected = messages.querySelector('input:checked'); if (!selected) return; selected.closest('.message').remove(); document.querySelector('#inbox-count').textContent = String(messages.querySelectorAll('.message').length); document.querySelector('#archive-count').textContent = '5'; });
+      document.querySelector('#search').addEventListener('input', (event) => { const term = event.target.value.toLowerCase(); for (const message of messages.querySelectorAll('.message')) message.style.display = message.textContent.toLowerCase().includes(term) ? 'grid' : 'none'; });
+      window.showScheduled = (visible) => { document.querySelector('#future').style.display = visible ? 'block' : 'none'; };
+    </script>
+  </body>
+</html>

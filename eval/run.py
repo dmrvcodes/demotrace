@@ -48,9 +48,9 @@ def aggregate(scored: list[dict], missing: list[str]) -> dict:
     }
 
 
-def passed(summary: dict) -> bool:
+def passed(summary: dict, min_cases: int = MIN_CASES) -> bool:
     return (
-        summary["cases_recorded"] >= MIN_CASES
+        summary["cases_recorded"] >= min_cases
         and not summary["cases_missing_results"]
         and summary["status_accuracy"] >= MIN_STATUS_ACCURACY
         and summary["false_shown_on_non_shown"] == 0
@@ -61,16 +61,20 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cases", type=Path, default=Path("eval/cases"))
     parser.add_argument("--runs", type=Path, default=Path("eval/runs"))
+    parser.add_argument("--min-cases", type=int, default=MIN_CASES,
+                        help="minimum distinct recorded cases required for this gate")
     args = parser.parse_args()
+    if args.min_cases < 1:
+        raise SystemExit("--min-cases must be at least 1")
     scored, missing = run(args.cases, args.runs)
     for item in scored:
         print(report(item))
     summary = aggregate(scored, missing)
     evidence = "-" if summary["evidence_hit_rate"] is None else f"{summary['evidence_hit_rate']:.0%}"
-    print(f"\nGate: {summary['cases_recorded']}/{MIN_CASES} recorded cases; status {summary['status_accuracy']:.0%}; evidence {evidence}; false Shown {summary['false_shown_on_non_shown']}/{summary['non_shown']}")
+    print(f"\nGate: {summary['cases_recorded']}/{args.min_cases} recorded cases; status {summary['status_accuracy']:.0%}; evidence {evidence}; false Shown {summary['false_shown_on_non_shown']}/{summary['non_shown']}")
     if missing:
         print(f"Missing live runs: {', '.join(missing)}")
-    if passed(summary):
+    if passed(summary, args.min_cases):
         print("PASS")
         return 0
     print("FAIL — do not quote this as a quality result yet.")

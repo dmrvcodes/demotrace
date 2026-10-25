@@ -21,6 +21,8 @@
 *.mkv
 !web/public/samples/todomvc-sample.mp4
 /eval/runs/
+/eval/recorder/audio/
+/eval/recorder/*.timing.json
 
 # Python
 .venv/

@@ -53,12 +53,12 @@ Hand-labelled cases live in [`eval/cases`](eval/cases). Raw videos and Lambda ou
 local by design. Run the honest quality gate with:
 
 ```bash
-.venv/bin/python eval/run.py
+.venv/bin/python eval/run.py --min-cases 6
 ```
 
-It requires four recorded, hand-labelled cases, status accuracy of at least 70%, and **zero false
-Shown verdicts on negative cases**. The current 24 October smoke eval has four live Lambda → Claude
-recordings (19 claims): **100% status accuracy, 100% evidence hits and 0/12 false Shown**. This is
+It requires six recorded, hand-labelled cases, status accuracy of at least 70%, and **zero false
+Shown verdicts on negative cases**. The current 25 October live Lambda → Claude pass has six
+recordings (27 claims): **100% status accuracy, 100% evidence hits and 0/16 false Shown**. This is
 a small, hand-labelled smoke eval—not a general accuracy claim—and raw videos and responses remain
 out of Git.
 

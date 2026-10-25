@@ -78,7 +78,10 @@ def cmd_lambda_smoke(args: argparse.Namespace) -> int:
     profile = awsguard.profile(args.profile)
     account = awsguard.check_account(profile)  # before anything else touches AWS
     print(f"AWS account {account} via profile {profile}: matches DEMOTRACE_AWS_ACCOUNT_ID")
-    return run(boto3.Session(profile_name=profile), account, Path(args.video), load_claims(Path(args.claims)))
+    return run(
+        boto3.Session(profile_name=profile), account, Path(args.video), load_claims(Path(args.claims)),
+        result_out=Path(args.result_out) if args.result_out else None,
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -105,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     ls.add_argument("video")
     ls.add_argument("--claims", required=True, help="JSON file with 3–5 claims")
     ls.add_argument("--profile", default=None, help="AWS profile (default: AWS_PROFILE from .env)")
+    ls.add_argument("--result-out", help="write the actual completed Lambda result JSON for eval scoring")
     ls.set_defaults(func=cmd_lambda_smoke)
 
     from . import awsguard

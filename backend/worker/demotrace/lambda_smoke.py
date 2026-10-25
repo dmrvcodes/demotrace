@@ -22,7 +22,8 @@ def _plain(value):
 
 
 def run(session, account: str, video: Path, claims: Sequence[str], *, region: str = "us-east-1",
-        table_name: str = "demotrace-jobs", function: str = "demotrace-worker") -> int:
+        table_name: str = "demotrace-jobs", function: str = "demotrace-worker",
+        result_out: Path | None = None) -> int:
     bucket = f"demotrace-{account}-{region}"
     table = session.resource("dynamodb", region_name=region).Table(table_name)
     s3 = session.client("s3", region_name=region)
@@ -53,6 +54,10 @@ def run(session, account: str, video: Path, claims: Sequence[str], *, region: st
 
     print(f"timings (s): {item.get('timings')}")
     if status == "completed":
+        if result_out:
+            result_out.parent.mkdir(parents=True, exist_ok=True)
+            result_out.write_text(json.dumps(item["result"], indent=2) + "\n")
+            print(f"saved result: {result_out}")
         for claim in item["result"]["claims"]:
             refs = ", ".join(f"{e['ref_id']}@{e['t']:.1f}s" for e in claim["evidence"]) or "-"
             print(f"  {claim['claim_id']} {claim['status'].upper():9} [{refs}]  {claim['text']}")

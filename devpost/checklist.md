@@ -109,7 +109,7 @@ Build mode: fast
   Learner check: Try to break it: a video over 3 minutes, an HEVC file, a refused request, a reload mid-analysis; tell me which message was unclear.
   Commit: `Harden limits, timeouts and clean-up on the live system`
 
-- [ ] **11. A six-video quality pass you can quote honestly in the README**
+- [x] **11. A six-video quality pass you can quote honestly in the README**
   Becomes usable: Six labelled videos (negatives included) run through the same gate, with the numbers and the prompt tuned until the goal of at least 80% holds.
   Why now: The quality of "shown versus told" is the product. Your plan reserves Friday and Saturday for it, after the system is stable.
   PRD ref: `prd.md > Product Decisions`
@@ -142,6 +142,7 @@ Agent verification, 24 October (commit `b64e787`): CI/deploy run 40086717475 gre
 - [x] Polling is immediate once, then every 2 seconds; it does not issue overlapping requests after the screen changes.
 - [x] `prd.md > Returning to a result` is implemented: claims/job/report persist locally for seven days; completed reports request the original local video for interactive evidence playback.
 - [x] The four-recording eval gate passes from fresh live Lambda results.
+- [x] Six-video gate (`.venv/bin/python eval/run.py --min-cases 6`) passes from fresh live Lambda results: 6 recordings, 27 claims, 100% status accuracy, 100% evidence hits, 0/16 false Shown.
 - [x] 25 October agent production check: unauthenticated read returned 404; an original S3 version remained pinned despite an overwrite; the Worker completed from that version and left no S3 versions; Worker logs contained no private markers; capacity 0 returned the public 429, then `MAX_DAILY_ANALYSES` restored exactly to 30. The diagnostic is [`scripts/live_system_check.py`](../scripts/live_system_check.py), which cleans up and restores in `finally`.
 - [ ] Remaining Slice 10 browser checks: select the HEVC test file and confirm the re-export message; reload while a live job is processing, then reopen the completed report, reattach its source video and click evidence. (The automation extension needs its local-file access enabled before it can select the generated HEVC test file.)
 - [ ] Final review complete — feedback resolved and learner confirms ready to ship
@@ -167,6 +168,7 @@ Activity mode: not started; app map ready.
 - 24 October — "Try with sample" shows a recorded TodoMVC analysis instead of Big Buck Bunny — the sample is the first thing judges open, and it should show the product's real output.
 - 24 October — short recordings (up to 90 seconds) sample frames every 0.5 seconds, while longer recordings keep 1-second sampling; the 90-frame model cap remains. This caught a 0.7-second save toast that the old cadence missed. The gate now counts false Shown for every claim expected not to be shown, including Told only → Shown and Missing → Shown; the compound-claim prompt rule prevents a visible Share button from being mistaken for a completed share.
 - 25 October — the browser now inspects MP4 sample-entry markers at the beginning and end of a file before upload and rejects HEVC (`hvc1`/`hev1`), rather than inferring the selected file's codec from the browser's playback capabilities. `scripts/live_system_check.py` provides a repeatable production check for auth, version pinning, cleanup, log privacy and the emergency capacity switch; it restores the exact Lambda environment in `finally`.
+- 25 October — two additional independently recorded local mocks, Planly Kanban and Relay Inbox, went through the same deployed Lambda → Claude Worker and were hand-labelled before scoring. `lambda-smoke --result-out` now writes the actual completed result for a reproducible local eval run. The explicit six-case gate passed with 27 claims, 100% status accuracy, 100% evidence hits and 0/16 false Shown; those numbers are intentionally described as a small smoke eval rather than general accuracy.
 
 - 23 October — Bedrock remained account-blocked, so the deployed Worker uses the authorized
   direct Anthropic API credential held in AWS Secrets Manager. The live Control API is a

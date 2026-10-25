@@ -24,3 +24,9 @@ def test_gate_requires_four_recorded_cases_and_no_false_shown():
     assert passed(aggregate([base] * 4, []))
     failed = {"rows": [{"status_ok": True, "evidence_hit": True, "expected": "missing", "false_shown": True}]}
     assert not passed(aggregate([base, base, base, failed], []))
+
+
+def test_gate_accepts_an_explicit_six_case_requirement():
+    base = {"rows": [{"status_ok": True, "evidence_hit": True, "expected": "shown", "false_shown": False}]}
+    assert not passed(aggregate([base] * 5, []), min_cases=6)
+    assert passed(aggregate([base] * 6, []), min_cases=6)
