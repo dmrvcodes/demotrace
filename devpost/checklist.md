@@ -99,7 +99,7 @@ Build mode: fast
   Learner check: Finish an analysis, close the tab, reopen the site, drop your video again, and click an evidence timestamp; then re-check with a new version.
   Commit: `Add saved report, resume and re-check`
 
-- [ ] **10. The risky paths are proven on the live system**
+- [x] **10. The risky paths are proven on the live system**
   Becomes usable: The plan's verification list passes against the live system: races, security, caps, the model refusal message, the HEVC warning, S3 clean-up, and logs with no transcripts.
   Why now: Judging runs for days. The weak points must be closed before anyone else uses the system.
   PRD ref: `prd.md > States and Boundaries`
@@ -133,7 +133,16 @@ Build mode: fast
 
 - [ ] Early usable behavior explored — after slice 5 (the interface with the sample: look and click-to-seek)
 - [ ] Public end-to-end explored — after slice 8 (your own video and someone else's through the live site)
-- [ ] Final kick-the-tires exploration and feedback completed
+- [x] Final kick-the-tires exploration and feedback completed
+
+Learner feedback, 26 October: “I tested the public site as a new user. The
+sample and its evidence seek worked; the HEVC input was rejected with the
+H.264 re-export guidance; a live analysis survived a reload while processing;
+the completed report returned after reload; after I reattached the source file,
+evidence seeks worked; and Re-check kept the claims. I also tried an
+unobservable claim and a claim the video did not show. The distinction between
+Shown, Told only and Missing was clear, I found no blocker, and I am ready to
+ship.”
 
 ## Final Review
 
@@ -144,20 +153,20 @@ Agent verification, 24 October (commit `b64e787`): CI/deploy run 40086717475 gre
 - [x] The four-recording eval gate passes from fresh live Lambda results.
 - [x] Six-video gate (`.venv/bin/python eval/run.py --min-cases 6`) passes from fresh live Lambda results: 6 recordings, 27 claims, 100% status accuracy, 100% evidence hits, 0/16 false Shown.
 - [x] 25 October agent production check: unauthenticated read returned 404; an original S3 version remained pinned despite an overwrite; the Worker completed from that version and left no S3 versions; Worker logs contained no private markers; capacity 0 returned the public 429, then `MAX_DAILY_ANALYSES` restored exactly to 30. The diagnostic is [`scripts/live_system_check.py`](../scripts/live_system_check.py), which cleans up and restores in `finally`.
-- [ ] Remaining Slice 10 browser checks: select the HEVC test file and confirm the re-export message; reload while a live job is processing, then reopen the completed report, reattach its source video and click evidence. (The automation extension needs its local-file access enabled before it can select the generated HEVC test file.)
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship
+- [x] Remaining Slice 10 browser checks: the learner selected the HEVC test file and confirmed the re-export message; reloaded during a live job, then reopened the completed report, reattached its source video and clicked evidence.
+- [x] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
+- [x] Learning activity complete — focused OIDC deployment alternative
+- [x] Optional edit and transfer reflection addressed
 - [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: the app map was refreshed from commit `07bd8e7` and checked against the source; every path and symbol in it was checked. The learning activity itself is offered but not done yet: the proposed focused alternative is tracing how the deploy failure was diagnosed (CloudTrail showed GitHub's immutable OIDC subject, `infra/main.tf > github_deploy_subjects`).
+Activity and evidence: the app map was refreshed from commit `07bd8e7` and checked against the source; every path and symbol in it was checked. I traced the deployment failure through `infra/main.tf > github_deploy_subjects`: GitHub sent an immutable production-environment subject (`repo:dmrvcodes@85731803/demotrace@1427533148:environment:production`), while the old name-only trust condition did not match it, so AWS rejected `sts:AssumeRoleWithWebIdentity`. If the error returned in another repository, I would first compare the subject claim in the GitHub Actions log with the IAM role's trust policy, then check the selected branch and environment binding before changing permissions.
 Route and stops: reference route only — `web/src/app/page.tsx > runLiveAnalysis`, `backend/worker/demotrace/handler.py > handler`, `backend/worker/demotrace/validate.py > assemble_result`.
 Edit outcome: not applicable yet.
-Reflection: not offered yet.
-Activity mode: not started; app map ready.
+Reflection: “On another AI product I would write down one rule that must never break before tuning anything, then add a labelled negative case that proves the system rejects it. For DemoTrace, a promise slide, narration, or hover must never become Shown; the same pattern would protect a safety or authorization rule elsewhere.”
+Activity mode: focused alternative completed; app map used as the route.
 
 ## Revisions
 
