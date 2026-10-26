@@ -22,7 +22,8 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [videoSrc, setVideoSrc] = useState(restoredCompleted ? "" : SAMPLE_VIDEO);
+  // A restored live job (finished or still running) must ask for its own video, never fall back to the sample.
+  const [videoSrc, setVideoSrc] = useState(restoredCompleted || restoredWaiting ? "" : SAMPLE_VIDEO);
   const [claims, setClaims] = useState(restored?.claims ?? ["", "", ""]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
