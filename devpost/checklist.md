@@ -161,6 +161,13 @@ Activity mode: not started; app map ready.
 
 ## Revisions
 
+- 26 October — the early hands-on checkpoints after slices 5 and 8 were not
+  retrospectively marked complete. Their scheduled learner exploration did not
+  happen at those milestones; the equivalent product checks were instead
+  covered by agent verification, the recorded live Lambda eval, and the final
+  learner kick-the-tires session still required below. This preserves the
+  distinction between mechanical verification and the learner's own feedback.
+
 - 24 October — slices re-scoped to what was built and verified: slice 2 runs against the direct Anthropic API instead of Bedrock (small smoke locally, the realistic call through the Lambda); slice 3's local `analyze --replay` command became the Worker's evidence map plus `lambda-smoke` and `eval/score.py` for replaying recorded runs; slice 12 manages every resource in Terraform with S3 remote state and CI applies (no destroy-and-rebuild, the plan shows no drift) — Bedrock was blocked, and rebuilding live resources two days before submission would only add risk.
 - 24 October — the model client calls `messages.create` with a strict JSON schema and checks the stop reason before validating; 529 is retried — `messages.parse` turned refusals and cut-off answers into `model_invalid_output`, and `OverloadedError` is not an `InternalServerError`.
 - 24 October — ffmpeg/ffprobe run with timeouts derived from the Lambda's remaining time, `-t 180.5`, local files only and an environment without secrets; the video is deleted from S3 right after download — with reserved concurrency 2, two hanging files could otherwise block every analysis for 15 minutes.
