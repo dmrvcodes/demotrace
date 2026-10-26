@@ -6,7 +6,8 @@ Upload an MP4 demo, write three to five observable claims, and get an evidence m
 is marked **Shown**, **Told only**, or **Missing**, with a click that seeks directly to the cited
 frame or speech segment.
 
-Live app: [demotrace.vercel.app](https://demotrace.vercel.app)
+Live app: [demotrace.vercel.app](https://demotrace.vercel.app) ·
+Demo video (2:28): [YouTube](https://www.youtube.com/watch?v=R_W9WrFR5QY)
 
 ## Why it is useful
 
